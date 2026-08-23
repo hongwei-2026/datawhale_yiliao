@@ -1,0 +1,32 @@
+# 环境与密钥
+.env
+.env.local
+.env.*
+!.env.example
+*.pem
+
+# 数据库文件（仅根目录本地库，勿忽略 web/data）
+/data/
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env.venv/
+
+# IDE / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# 日志与缓存
+*.log
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/

@@ -1,0 +1,49 @@
+{
+  "scenes": [
+    {
+      "id": "informed_consent",
+      "code": "S1",
+      "name": "知情同意沟通",
+      "status": "mvp",
+      "statusLabel": "一期必做",
+      "description": "研究者向试验参与者/代理人充分告知并获取自愿同意",
+      "primaryStandards": ["gcp-2020", "gcp-2026", "helsinki-2024", "ethics-2023"]
+    },
+    {
+      "id": "risk_explanation",
+      "code": "S2",
+      "name": "风险解释",
+      "status": "planned",
+      "statusLabel": "预留",
+      "description": "平衡、准确地说明试验风险与获益不确定性",
+      "primaryStandards": ["gcp-2020", "ich-e6-r3"]
+    },
+    {
+      "id": "medication",
+      "code": "S3",
+      "name": "用药情况了解",
+      "status": "planned",
+      "statusLabel": "预留",
+      "description": "说明用药方法、了解依从性与合并用药",
+      "primaryStandards": ["gcp-2020", "gcp-2026"]
+    },
+    {
+      "id": "adherence",
+      "code": "S4",
+      "name": "依从性沟通",
+      "status": "planned",
+      "statusLabel": "预留",
+      "description": "识别并讨论漏服、错服等不依从问题",
+      "primaryStandards": ["gcp-2020", "gcp-2026"]
+    },
+    {
+      "id": "follow_up",
+      "code": "S5",
+      "name": "随访与 AE 沟通",
+      "status": "planned",
+      "statusLabel": "预留",
+      "description": "随访期间 AE 处理、试验终止通知与新安全性信息沟通",
+      "primaryStandards": ["gcp-2020", "gcp-2026"]
+    }
+  ]
+}

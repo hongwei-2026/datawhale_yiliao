@@ -1,0 +1,21 @@
+{
+  "meta": {
+    "schema_version": "1.0.0",
+    "default_case_id": "CASE-T2DM-PH2-001",
+    "note": "病例目录；完整包见 cases/*.json。占位数据待正式临床内容替换。"
+  },
+  "cases": [
+    {
+      "case_id": "CASE-T2DM-PH2-001",
+      "short_title": "2型糖尿病 · II期知情同意",
+      "title": "2型糖尿病口服降糖新药 II 期试验 · 知情同意（占位病例）",
+      "data_status": "placeholder",
+      "version": "0.1.0",
+      "disease_code": "T2DM",
+      "is_default": true,
+      "mvp_scenes": ["S1"],
+      "file": "cases/CASE-T2DM-PH2-001.json",
+      "one_liner": "68岁男性，血糖控制欠佳，拟参加口服降糖新药试验的知情同意沟通（教学占位数据）。"
+    }
+  ]
+}

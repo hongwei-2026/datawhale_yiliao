@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI 标准化病人 · 沟通训练底座</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/main.css" />
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 3v18M3 12h18"/><circle cx="12" cy="12" r="9"/>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <h1>AI 标准化病人</h1>
+          <p>沟通训练 · 标准 + 病例 + 数据库</p>
+        </div>
+      </div>
+
+      <p class="nav-label">从这里开始</p>
+      <nav class="nav" id="nav"></nav>
+      <p class="nav-label nav-label-secondary">进阶</p>
+      <nav class="nav nav-secondary" id="nav-advanced"></nav>
+
+      <footer class="sidebar-foot">
+        <div class="conn-status" id="conn-status" title="后端与数据库连接状态">
+          <span class="conn-dot"></span>
+          <span class="conn-text">检测中…</span>
+        </div>
+        <div class="foot-badge">教学模拟</div>
+        <small id="data-version">数据 v—</small>
+      </footer>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div class="topbar-intro">
+          <p class="eyebrow" id="page-eyebrow">Standard Registry</p>
+          <h2 id="page-title">概览</h2>
+          <p id="page-desc">药物临床试验研究者沟通标准可视化平台</p>
+        </div>
+        <div class="search-box">
+          <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <input type="search" id="global-search" placeholder="搜索标准、评分项…" autocomplete="off" />
+        </div>
+      </header>
+
+      <div id="view" class="view"></div>
+    </main>
+  </div>
+
+  <div id="modal" class="modal hidden" aria-hidden="true">
+    <div class="modal-backdrop" data-close></div>
+    <div class="modal-panel" role="dialog" aria-modal="true">
+      <button class="modal-close" data-close aria-label="关闭">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6 6 18"/></svg>
+      </button>
+      <div id="modal-body"></div>
+    </div>
+  </div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

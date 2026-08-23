@@ -1,0 +1,415 @@
+{
+  "meta": {
+    "case_id": "CASE-T2DM-PH2-001",
+    "title": "2型糖尿病口服降糖新药 II 期试验 · 知情同意（占位病例）",
+    "short_title": "2型糖尿病 · II期知情同意",
+    "data_status": "placeholder",
+    "version": "0.1.0",
+    "locale": "zh-CN",
+    "is_default": true,
+    "schema_ref": "db/schema.sql",
+    "disclaimer": "本病例为教学模拟占位数据，试验药名、剂量、风险发生率等均为虚构，不对应任何真实在研产品或真实受试者。正式训练前须由临床/GCP 人员替换为经审数据。",
+    "replacement_note": "有真实方案与症状事实后：升 version 至 1.0.0，data_status 改为 reviewed → active，并启用症状绑定评分项。"
+  },
+  "disease": {
+    "disease_code": "T2DM",
+    "name_zh": "2型糖尿病",
+    "name_en": "Type 2 Diabetes Mellitus",
+    "icd10_code": "E11",
+    "description": "以胰岛素抵抗和/或胰岛β细胞功能缺陷为特征的慢性代谢性疾病（教学简述）。"
+  },
+  "protocol": {
+    "protocol_code": "PROTO-T2DM-PH2-DEMO",
+    "title": "某口服降糖候选药物 II 期探索性试验（教学虚构）",
+    "phase": "II",
+    "intervention_summary": "每日口服试验用降糖药片 1 次，疗程约 12 周；需按访视抽血监测血糖与安全性指标。",
+    "control_summary": "可能分配到试验药或对照药（含安慰剂可能），具体以知情同意书为准；分配方式由方案规定，受试者与部分研究者可能不知分组。",
+    "is_placeholder": true,
+    "status": "draft"
+  },
+  "clinical_summary": {
+    "chief_complaint": "血糖控制不好，想来了解能不能参加新药试验",
+    "disease_duration": "约 8 年",
+    "disease_stage": "口服药治疗中，近期血糖仍偏高",
+    "history_present": [
+      "近半年口渴、夜尿增多更明显",
+      "容易觉得累，爬一层楼就喘不上气似的乏力",
+      "有时眼睛花、看东西不清楚",
+      "脚趾偶尔发麻"
+    ],
+    "history_past": [
+      "2型糖尿病 8 年",
+      "高血压 5 年（口服降压药，自述控制尚可）",
+      "否认酮症酸中毒住院史",
+      "否认已知严重肝肾衰竭"
+    ],
+    "family_history": [
+      "父亲有糖尿病"
+    ],
+    "social_notes": "退休，与配偶同住；识字，能缓慢阅读知情同意书；会反复确认能不能退出。"
+  },
+  "inclusion_hints": [
+    "教学设定：符合方案年龄与诊断要求（占位）",
+    "能理解并签署知情同意（或在帮助下完成）"
+  ],
+  "exclusion_hints": [
+    "教学设定：无方案列出的绝对排除项（占位，待正式数据替换）"
+  ],
+  "comorbidities": [
+    {
+      "name": "高血压",
+      "status": "stable",
+      "note": "口服降压药中"
+    }
+  ],
+  "symptoms": [
+    {
+      "symptom_id": "SX-T2DM-01",
+      "name": "口渴多饮",
+      "clinical_name": "烦渴 / 多饮",
+      "category": "metabolic",
+      "is_core": true,
+      "present": true,
+      "severity_band": "moderate",
+      "onset_text": "近半年加重",
+      "course_text": "白天也总想喝水",
+      "patient_may_say": [
+        "老是口干，喝好多水还是渴",
+        "最近特别能喝水"
+      ],
+      "researcher_should_ask": [
+        "口渴多久了、有没有加重",
+        "一天大概喝多少水"
+      ],
+      "forbidden_confusions": [
+        "不要说成甲亢典型表现作为主诊断",
+        "不要编造大量饮水导致的其他急症"
+      ]
+    },
+    {
+      "symptom_id": "SX-T2DM-02",
+      "name": "尿频多尿",
+      "clinical_name": "多尿 / 夜尿增多",
+      "category": "metabolic",
+      "is_core": true,
+      "present": true,
+      "severity_band": "moderate",
+      "onset_text": "与口渴同期加重",
+      "course_text": "夜里要起来上厕所两三次",
+      "patient_may_say": [
+        "晚上老要起来上厕所",
+        "尿比以前多"
+      ],
+      "researcher_should_ask": [
+        "夜尿几次",
+        "有没有尿痛、血尿（鉴别）"
+      ],
+      "forbidden_confusions": [
+        "不要主动编造尿路感染确诊",
+        "不要编造急性肾衰竭"
+      ]
+    },
+    {
+      "symptom_id": "SX-T2DM-03",
+      "name": "乏力",
+      "clinical_name": "疲乏",
+      "category": "constitutional",
+      "is_core": true,
+      "present": true,
+      "severity_band": "mild",
+      "onset_text": "近几个月",
+      "course_text": "活动后更明显，休息可缓解",
+      "patient_may_say": [
+        "提不起劲",
+        "动一动就累"
+      ],
+      "researcher_should_ask": [
+        "乏力是否影响日常活动",
+        "有无伴随胸痛气促（需与心肺问题区分询问）"
+      ],
+      "forbidden_confusions": [
+        "不要自称心肌梗死刚出院（未登记）"
+      ]
+    },
+    {
+      "symptom_id": "SX-T2DM-04",
+      "name": "视物模糊",
+      "clinical_name": "视力模糊",
+      "category": "ocular",
+      "is_core": true,
+      "present": true,
+      "severity_band": "mild",
+      "onset_text": "间歇出现",
+      "course_text": "血糖高时好像更明显",
+      "patient_may_say": [
+        "有时候眼睛花",
+        "看报纸字会糊"
+      ],
+      "researcher_should_ask": [
+        "是否已看过眼科",
+        "是否突然视力丧失（否定则勿夸大）"
+      ],
+      "forbidden_confusions": [
+        "不要编造已确诊增殖期视网膜病变手术史（未登记）"
+      ]
+    },
+    {
+      "symptom_id": "SX-T2DM-05",
+      "name": "足趾麻木",
+      "clinical_name": "远端感觉异常（轻）",
+      "category": "neurologic",
+      "is_core": true,
+      "present": true,
+      "severity_band": "mild",
+      "onset_text": "近一年偶发",
+      "course_text": "脚趾尖发麻，能忍受",
+      "patient_may_say": [
+        "脚指头有时候麻麻的",
+        "不算疼，就是不舒服"
+      ],
+      "researcher_should_ask": [
+        "麻木范围、是否对称",
+        "有无足部溃疡"
+      ],
+      "forbidden_confusions": [
+        "不要演成急性脑卒中偏瘫",
+        "不要编造足坏疽"
+      ]
+    },
+    {
+      "symptom_id": "SX-T2DM-06",
+      "name": "胸痛",
+      "clinical_name": "胸痛",
+      "category": "cardiovascular",
+      "is_core": false,
+      "present": false,
+      "severity_band": "none",
+      "onset_text": null,
+      "course_text": "本病例当前无胸痛主诉",
+      "patient_may_say": [
+        "胸口倒是不疼"
+      ],
+      "researcher_should_ask": [],
+      "forbidden_confusions": [
+        "若被追问，可答没有；勿临时编造心绞痛发作史"
+      ]
+    }
+  ],
+  "medication": {
+    "investigational_summary": "试验用口服降糖药（虚构名「示意片」），用法以知情同意书为准；可能有胃肠道不适等反应（占位）。",
+    "current_regimen_summary": "目前口服两种常用降糖药（具体商品名待正式数据填写）；另服一种降压药。",
+    "common_nonadherence": [
+      "偶尔外出忘记带药",
+      "觉得血糖还行就自行减片（需研究者了解，患者可能不好意思说）"
+    ],
+    "caution_points": [
+      "合并用药需如实告知",
+      "出现心慌、冷汗等疑似低血糖要及时联系研究团队（教学要点）"
+    ],
+    "concomitant_drugs": [
+      {
+        "drug_name": "降糖药 A（占位）",
+        "dose_text": "按医嘱口服",
+        "purpose": "控制血糖",
+        "is_ongoing": true
+      },
+      {
+        "drug_name": "降糖药 B（占位）",
+        "dose_text": "按医嘱口服",
+        "purpose": "控制血糖",
+        "is_ongoing": true
+      },
+      {
+        "drug_name": "降压药（占位）",
+        "dose_text": "每日一次",
+        "purpose": "高血压",
+        "is_ongoing": true
+      }
+    ]
+  },
+  "risks": [
+    {
+      "risk_id": "RK-T2DM-01",
+      "title": "胃肠道不适",
+      "lay_summary": "吃药后可能会恶心、拉肚子或不想吃饭，多数可缓解，但因人而异。",
+      "must_disclose": true,
+      "severity_hint": "common",
+      "source_note": "占位：对应 ICF 常见不良反应节"
+    },
+    {
+      "risk_id": "RK-T2DM-02",
+      "title": "低血糖相关不适",
+      "lay_summary": "血糖掉得太低可能心慌、出冷汗、手抖，严重时会很危险，需要马上处理并联系医生。",
+      "must_disclose": true,
+      "severity_hint": "important",
+      "source_note": "占位"
+    },
+    {
+      "risk_id": "RK-T2DM-03",
+      "title": "抽血与访视负担",
+      "lay_summary": "要按时间来医院抽血、做检查，可能有点疼、淤青，也要花时间和路上奔波。",
+      "must_disclose": true,
+      "severity_hint": "procedure",
+      "source_note": "占位"
+    },
+    {
+      "risk_id": "RK-T2DM-04",
+      "title": "未知风险",
+      "lay_summary": "新药还在研究，可能有现在不知道的副作用。",
+      "must_disclose": true,
+      "severity_hint": "unknown",
+      "source_note": "知情同意通用要点"
+    },
+    {
+      "risk_id": "RK-T2DM-05",
+      "title": "可能分到对照/安慰剂",
+      "lay_summary": "不一定能吃到试验新药，也可能是对照药或安慰剂，血糖不一定因此变好。",
+      "must_disclose": true,
+      "severity_hint": "design",
+      "source_note": "与获益不确定性一起讲"
+    }
+  ],
+  "benefits": [
+    {
+      "benefit_id": "BF-T2DM-01",
+      "title": "可能改善血糖（不确定）",
+      "lay_summary": "试验药也许对血糖有帮助，但也可能没什么用，不能打包票。",
+      "is_uncertain": true,
+      "must_disclose": true
+    },
+    {
+      "benefit_id": "BF-T2DM-02",
+      "title": "更密切的随访监测",
+      "lay_summary": "参加试验期间会有按计划的检查和随访，但这不等于日常看病被替代。",
+      "is_uncertain": false,
+      "must_disclose": true
+    },
+    {
+      "benefit_id": "BF-T2DM-03",
+      "title": "对医学研究的贡献",
+      "lay_summary": "即使个人获益不明显，也可能帮助后来的患者，但这不是强迫参加的理由。",
+      "is_uncertain": false,
+      "must_disclose": false
+    }
+  ],
+  "visits": [
+    {
+      "visit_id": "V-SCREEN",
+      "name": "筛选/知情同意访视",
+      "timing_text": "入组前",
+      "purpose": "充分告知、签署知情同意、基线评估",
+      "items": [
+        { "item_id": "VI-01", "item_type": "other", "label": "知情同意过程", "linked_symptom_id": null },
+        { "item_id": "VI-02", "item_type": "lab", "label": "血糖等相关检查（占位）", "linked_symptom_id": null }
+      ]
+    },
+    {
+      "visit_id": "V-W4",
+      "name": "治疗第 4 周随访",
+      "timing_text": "入组后约 4 周",
+      "purpose": "安全性、症状与用药依从",
+      "items": [
+        { "item_id": "VI-11", "item_type": "symptom", "label": "询问口渴多尿乏力等", "linked_symptom_id": "SX-T2DM-01" },
+        { "item_id": "VI-12", "item_type": "ae", "label": "不良事件问询", "linked_symptom_id": null },
+        { "item_id": "VI-13", "item_type": "adherence", "label": "服药依从", "linked_symptom_id": null }
+      ]
+    },
+    {
+      "visit_id": "V-W12",
+      "name": "治疗结束访视（约 12 周）",
+      "timing_text": "入组后约 12 周",
+      "purpose": "疗效与安全性总结评估（占位）",
+      "items": [
+        { "item_id": "VI-21", "item_type": "lab", "label": "实验室检查", "linked_symptom_id": null },
+        { "item_id": "VI-22", "item_type": "ae", "label": "AE/SAE 回顾", "linked_symptom_id": null }
+      ]
+    }
+  ],
+  "lab_hints": [
+    {
+      "lab_id": "LAB-HBA1C",
+      "name": "糖化血红蛋白",
+      "value_text": "偏高（具体数值待正式数据）",
+      "interpreted_as": "近期血糖控制不理想",
+      "patient_knows": true
+    }
+  ],
+  "forbidden_fabrications": [
+    {
+      "forbidden_id": "FB-01",
+      "category": "diagnosis",
+      "description": "不得自称 1 型糖尿病或糖尿病酮症酸中毒正在发作",
+      "remediating_reply": "我一直是医生说的 2 型，没有听说过酮症那回事。"
+    },
+    {
+      "forbidden_id": "FB-02",
+      "category": "event",
+      "description": "不得编造近期心梗、脑梗、肿瘤化疗等未登记重大事件",
+      "remediating_reply": "这些我倒没有，就是血糖和高血压的事。"
+    },
+    {
+      "forbidden_id": "FB-03",
+      "category": "claim",
+      "description": "不得替研究者保证「一定能治好」「绝对没副作用」",
+      "remediating_reply": "这个我也不敢说一定，得听医生把风险讲清楚。"
+    },
+    {
+      "forbidden_id": "FB-04",
+      "category": "symptom",
+      "description": "不得新增库外核心症状（如严重水肿、剧烈胸痛）当作长期主诉",
+      "remediating_reply": "你说的这个我好像没有，主要还是口渴、夜尿和没劲。"
+    },
+    {
+      "forbidden_id": "FB-05",
+      "category": "lab",
+      "description": "不得捏造具体化验数值（除非 lab_hints 已写）",
+      "remediating_reply": "具体数字我记不清，片子/单子在家，大概医生说偏高。"
+    }
+  ],
+  "persona": {
+    "persona_id": "PER-ELDER-BASIC-01",
+    "display_name": "基本老年受试者（占位）",
+    "age_band": "65-74",
+    "age_years": 68,
+    "sex": "male",
+    "cognition_level": "average",
+    "emotion_baseline": "anxious_mild",
+    "adherence_tendency": "mostly_adherent",
+    "concealment_tendency": "low",
+    "comprehension_style": "repeats_key_questions",
+    "literacy_level": "secondary",
+    "hearing_note": "normal",
+    "living_situation": "with_spouse",
+    "lay_bio": "退休男性，说话偏慢，会把「能不能退出」「是不是一定有效」问两遍；不无故隐瞒症状，但听到副作用会紧张。",
+    "extra_slots": {
+      "family_companion": "spouse_may_attend",
+      "signature_ability": "self"
+    }
+  },
+  "scene_bindings": [
+    {
+      "scene_code": "S1",
+      "scene_key": "informed_consent",
+      "enabled": true,
+      "notes": "一期主场景：使用 risks/benefits + clinical_summary + persona"
+    },
+    {
+      "scene_code": "S3",
+      "scene_key": "medication",
+      "enabled": false,
+      "notes": "预留：启用后加载 medication 与依从槽位"
+    },
+    {
+      "scene_code": "S5",
+      "scene_key": "follow_up",
+      "enabled": false,
+      "notes": "预留：启用后按 visits 采集症状/AE"
+    }
+  ],
+  "ai_constraints": {
+    "must_ground_symptoms_in": "symptoms where present=true",
+    "unknown_policy": "say_unsure_or_ask_doctor",
+    "tone": "口语、可重复提问、可表达担心，但不攻击研究者",
+    "scoring_note": "症状追问类评分项待 data_status=reviewed 后再硬启用"
+  }
+}

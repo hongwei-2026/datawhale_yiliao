@@ -1,0 +1,74 @@
+name: ci-quality-gate
+
+# GitCode 流水线：推送 / PR 到 main 时强制质量门禁
+# 注意：checkout 后代码在 repo_workspace/ 目录
+
+on:
+  push:
+    branches: ["main", "master"]
+  pull_request:
+    branches: ["main", "master"]
+  workflow_dispatch:
+
+jobs:
+  quality-gate:
+    name: Strict Quality Gate
+    runs-on: euleros-2.10.1
+    steps:
+      - uses: checkout-action@0.0.1
+
+      - name: Setup Python
+        uses: setup-python@0.0.1
+        with:
+          python-version: "3.10.12"
+
+      - name: Show environment
+        run: |
+          set -e
+          uname -a || true
+          python3 --version
+          ls -la
+          ls -la repo_workspace || true
+
+      - name: Install dependencies
+        run: |
+          set -e
+          cd repo_workspace
+          python3 -m pip install -U pip
+          python3 -m pip install -r server/requirements.txt
+          python3 -m pip install ruff==0.9.10
+
+      - name: Secret & structure gate
+        run: |
+          set -e
+          cd repo_workspace
+          python3 scripts/ci_check.py
+
+      - name: Ruff lint (server)
+        run: |
+          set -e
+          cd repo_workspace
+          # 严格：有问题即失败
+          ruff check server scripts --select E,F,W,B,UP --ignore E501
+
+      - name: Compile all Python
+        run: |
+          set -e
+          cd repo_workspace
+          python3 -m compileall -q server scripts
+
+      - name: Frontend static sanity
+        run: |
+          set -e
+          cd repo_workspace
+          test -f web/index.html
+          test -f web/js/app.js
+          test -f web/css/main.css
+          test -d web/data
+          python3 - <<'PY'
+          import pathlib, json
+          root = pathlib.Path('web/data')
+          for p in root.rglob('*.json'):
+              json.loads(p.read_text(encoding='utf-8'))
+          print('frontend json ok', len(list(root.rglob('*.json'))))
+          PY

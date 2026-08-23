@@ -1,0 +1,76 @@
+name: pr-contribution-guard
+
+# 针对 Pull Request 的更严格贡献守卫：阻止危险变更与裸密钥
+
+on:
+  pull_request:
+    branches: ["main", "master"]
+  workflow_dispatch:
+
+jobs:
+  contribution-guard:
+    name: Contribution Guard
+    runs-on: euleros-2.10.1
+    steps:
+      - uses: checkout-action@0.0.1
+
+      - name: Setup Python
+        uses: setup-python@0.0.1
+        with:
+          python-version: "3.10.12"
+
+      - name: Block dangerous paths in tree
+        run: |
+          set -e
+          cd repo_workspace
+          # 若这些文件出现在仓库中，直接失败
+          if [ -f .env ]; then
+            echo "ERROR: .env must never be committed"
+            exit 1
+          fi
+          if ls *.pem 1>/dev/null 2>&1; then
+            echo "ERROR: pem files are forbidden"
+            exit 1
+          fi
+          if [ -f data/sp_training.db ]; then
+            echo "ERROR: sqlite db must not be committed (local runtime artifact)"
+            exit 1
+          fi
+          echo "dangerous path check passed"
+
+      - name: Diff size guard (PR)
+        run: |
+          set -e
+          cd repo_workspace
+          # 没有 base 时跳过；有 PR diff 时限制超大单文件变更噪声
+          python3 - <<'PY'
+          import os, subprocess, sys
+          # 尽力获取变更文件；失败不阻断（兼容首次流水线）
+          try:
+              out = subprocess.check_output(["git", "diff", "--name-only", "HEAD~1"], text=True, stderr=subprocess.DEVNULL)
+          except Exception:
+              print("skip diff size (no HEAD~1)")
+              sys.exit(0)
+          files = [x.strip() for x in out.splitlines() if x.strip()]
+          big = []
+          for f in files:
+              if not os.path.isfile(f):
+                  continue
+              size = os.path.getsize(f)
+              if size > 2_000_000:
+                  big.append((f, size))
+          if big:
+              print("ERROR: oversized changed files:")
+              for f, s in big:
+                  print(f, s)
+              sys.exit(1)
+          print("diff size ok", len(files), "files")
+          PY
+
+      - name: Run full quality gate
+        run: |
+          set -e
+          cd repo_workspace
+          python3 -m pip install -U pip
+          python3 -m pip install -r server/requirements.txt
+          python3 scripts/ci_check.py

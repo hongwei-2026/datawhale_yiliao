@@ -1,0 +1,260 @@
+{
+  "meta": {
+    "version": "1.0.0",
+    "updated": "2026-08-23",
+    "description": "药物临床试验 AI 标准化病人 —— 标准资料统一注册表（本地 6 份 + 公开补充 3 份，共 9 项注册）"
+  },
+  "categories": [
+    { "id": "gcp", "name": "临床试验质量管理", "color": "#2563eb" },
+    { "id": "ethics", "name": "伦理与知情同意", "color": "#059669" },
+    { "id": "international", "name": "国际规范", "color": "#7c3aed" },
+    { "id": "training", "name": "人员培训", "color": "#d97706" },
+    { "id": "reference", "name": "参考解读", "color": "#64748b" }
+  ],
+  "standards": [
+    {
+      "id": "gcp-2020",
+      "title": "药物临床试验质量管理规范（2020）",
+      "shortTitle": "GCP 2020",
+      "category": "gcp",
+      "issuer": "国家药监局、国家卫生健康委",
+      "docNumber": "2020年第57号",
+      "status": "active",
+      "statusLabel": "现行（至 2026-09-01）",
+      "effectiveFrom": "2020-07-01",
+      "effectiveUntil": "2026-08-31",
+      "priority": "primary",
+      "projectRole": "一期评分主锚：第二十三条（知情同意过程）、第二十四条（ICF 必备内容）",
+      "localFile": "../标准资料/国家药监局 国家卫生健康委关于发布药物临床试验质量管理规范的公告.doc",
+      "localFileLabel": "本地 DOC（全文）",
+      "links": [
+        { "label": "国务院公报全文", "url": "https://www.gov.cn/gongbao/content/2020/content_5525106.htm", "primary": true },
+        { "label": "佑安医院转载", "url": "https://www.bjyayy.com.cn/Html/News/Articles/40348.html", "primary": false }
+      ],
+      "keyClauses": [
+        { "clause": "第三条", "summary": "受试者权益和安全优先；伦理审查与知情同意是重要措施" },
+        { "clause": "第十一条（十一）", "summary": "知情同意定义：书面签署 ICF 为证明" },
+        { "clause": "第二十三条", "summary": "研究者实施知情同意的 14 项过程要求" },
+        { "clause": "第二十四条", "summary": "ICF 应包含的 20 项必备内容" },
+        { "clause": "第十八条（二）", "summary": "随访期间 AE 妥善医疗处理并如实告知" }
+      ],
+      "terminology": ["受试者", "知情同意", "ICF", "AE", "SAE", "依从性"]
+    },
+    {
+      "id": "gcp-2026",
+      "title": "药物临床试验质量管理规范（2026年修订）",
+      "shortTitle": "GCP 2026",
+      "category": "gcp",
+      "issuer": "国家药监局、国家卫生健康委、国家中医药局、国家疾控局",
+      "docNumber": "2026年第50号",
+      "status": "upcoming",
+      "statusLabel": "已发布，2026-09-01 起施行",
+      "effectiveFrom": "2026-09-01",
+      "effectiveUntil": null,
+      "priority": "primary",
+      "projectRole": "前瞻对齐；知情同意见第二十七条；术语统一为「试验参与者」",
+      "localFile": "../标准资料/国家药品监督管理局2026年第50号公告附件1.doc",
+      "localFileLabel": "本地 DOC（附件1 全文）",
+      "links": [
+        { "label": "NMPA 官方公告", "url": "https://www.nmpa.gov.cn/xxgk/ggtg/ypggtg/ypqtggtg/20260608103856150.html", "primary": true },
+        { "label": "公告 PDF（含附件）", "url": "https://www.tid.gov.hk/en/tradecircular/files/2026/ci5162026a.pdf", "primary": false },
+        { "label": "上海市药监局转载", "url": "https://yjj.sh.gov.cn/qtgzwj/20260608/89cbf084b5cb4eab8fd0fb56d8538a1d.html", "primary": false }
+      ],
+      "keyClauses": [
+        { "clause": "第四条", "summary": "试验参与者权益和安全优先；伦理审查与知情同意" },
+        { "clause": "第二十七条", "summary": "实施知情同意 11 项要求（对应 2020 第二十三条）" },
+        { "clause": "第十九条", "summary": "主要研究者为现场最终责任人" },
+        { "clause": "第五十一条", "summary": "新增数据治理专章" }
+      ],
+      "terminology": ["试验参与者", "主要研究者", "伦理审查委员会"]
+    },
+    {
+      "id": "gcp-2026-qa",
+      "title": "GCP（2026年修订）问答文件",
+      "shortTitle": "GCP 2026 问答",
+      "category": "gcp",
+      "issuer": "国家药监局等",
+      "docNumber": "2026年第50号附件2",
+      "status": "upcoming",
+      "statusLabel": "已发布",
+      "effectiveFrom": "2026-09-01",
+      "effectiveUntil": null,
+      "priority": "secondary",
+      "projectRole": "说明 GCP 2026 与 E6(R3)、2023 伦理办法的衔接关系",
+      "localFile": "../标准资料/国家药品监督管理局2026年第50号公告附件2.doc",
+      "localFileLabel": "本地 DOC（问答）",
+      "links": [
+        { "label": "NMPA 官方公告（含附件）", "url": "https://www.nmpa.gov.cn/xxgk/ggtg/ypggtg/ypqtggtg/20260608103856150.html", "primary": true }
+      ],
+      "keyClauses": [
+        { "clause": "问答二", "summary": "与《涉及人的生命科学和医学研究伦理审查办法》等规范性文件衔接" },
+        { "clause": "问答三", "summary": "章节调整为六章54条，新增数据治理，删除方案/IB/必备文件专章（执行参照 E6 R3）" },
+        { "clause": "问答五", "summary": "强化试验参与者保护、知情同意材料更新、严重持续不依从审查" }
+      ],
+      "terminology": []
+    },
+    {
+      "id": "ich-e6-r3",
+      "title": "E6(R3)：药物临床试验质量管理规范技术指导原则",
+      "shortTitle": "ICH E6(R3)",
+      "category": "international",
+      "issuer": "ICH / 国家药监局适用公告",
+      "docNumber": "2025年第125号",
+      "status": "upcoming",
+      "statusLabel": "2026-03-31 后新试验适用",
+      "effectiveFrom": "2026-03-31",
+      "effectiveUntil": null,
+      "priority": "primary",
+      "projectRole": "知情同意原则（Principle 2）；质量源于设计；与 GCP 2026 衔接",
+      "localFile": "../标准资料/国家药监局关于适用《E6（R3）：药物临床试验质量管理规范技术指导原则》国际人用药品注册技术协调会指导原则的公告（2025年第125号）.doc",
+      "localFileLabel": "本地 DOC（适用公告）",
+      "links": [
+        { "label": "ICH 英文 PDF（Step 4）", "url": "https://database.ich.org/sites/default/files/ICH_E6%28R3%29_Step4_FinalGuideline_2025_0106.pdf", "primary": true },
+        { "label": "ICH 官方新闻", "url": "https://www.ich.org/news/ich-e6r3-good-clinical-practice-annex-2-adopted-and-published", "primary": false },
+        { "label": "NMPA 125号公告转载", "url": "https://www.ccfdie.org/zryyxxw/zxdt/webinfo/2026/01/1759934908068676.htm", "primary": false },
+        { "label": "CDE 指导原则查询", "url": "http://www.cde.org.cn/", "primary": false }
+      ],
+      "keyClauses": [
+        { "clause": "Principle 1", "summary": "参与者权益、安全与福祉优先于科学与社会获益" },
+        { "clause": "Principle 2", "summary": "知情同意是伦理 conduct 核心；自愿、充分告知、可理解" },
+        { "clause": "Principle 2.4", "summary": "紧急情况下无法事先获 IC 时的处理" },
+        { "clause": "Principle 6", "summary": "质量源于设计（QbD）与关键质量因素" }
+      ],
+      "terminology": ["trial participant", "informed consent", "quality by design"]
+    },
+    {
+      "id": "helsinki-2024",
+      "title": "世界医学会赫尔辛基宣言（2024）",
+      "shortTitle": "赫尔辛基宣言 2024",
+      "category": "ethics",
+      "issuer": "世界医学会（WMA）",
+      "docNumber": "2024年10月第75届大会通过",
+      "status": "active",
+      "statusLabel": "现行唯一官方版本",
+      "effectiveFrom": "2024-10-19",
+      "effectiveUntil": null,
+      "priority": "primary",
+      "projectRole": "GCP 引用的伦理上位原则；尊重自主、充分告知、风险获益权衡",
+      "localFile": "../标准资料/【最新国际标准】2024.10《赫尔辛基宣言(2024)》世界医学会.pdf",
+      "localFileLabel": "本地 PDF（扫描件，对照官网）",
+      "links": [
+        { "label": "WMA 英文官方", "url": "https://www.wma.net/policies-post/wma-declaration-of-helsinki/", "primary": true },
+        { "label": "WMA 简体中文", "url": "https://www.wma.net/what-we-do/medical-ethics/declaration-of-helsinki/doh-2024-in-simplified-chinese/", "primary": true },
+        { "label": "WMA 总入口", "url": "https://www.wma.net/what-we-do/medical-ethics/declaration-of-helsinki/", "primary": false }
+      ],
+      "keyClauses": [
+        { "clause": "一般原则 3-5", "summary": "参与者健康福祉优先；医生责任" },
+        { "clause": "知情同意相关", "summary": "充分告知后自愿同意；弱势群体额外保护" },
+        { "clause": "2024 修订要点", "summary": "强化参与者中心、社区参与、公平与风险获益分配" }
+      ],
+      "terminology": ["human participants", "informed consent"]
+    },
+    {
+      "id": "ethics-2023",
+      "title": "涉及人的生命科学和医学研究伦理审查办法",
+      "shortTitle": "伦理审查办法 2023",
+      "category": "ethics",
+      "issuer": "国家卫生健康委、教育部、科技部、国家中医药局",
+      "docNumber": "国卫科教发〔2023〕4号",
+      "status": "active",
+      "statusLabel": "现行",
+      "effectiveFrom": "2023-02-18",
+      "effectiveUntil": null,
+      "priority": "primary",
+      "projectRole": "GCP 2026 明确衔接；研究参与者 IC 一般要求（第三十三至三十八条）",
+      "localFile": null,
+      "localFileLabel": null,
+      "links": [
+        { "label": "国家中医药局转载", "url": "https://www.natcm.gov.cn/kejisi/zhengcewenjian/2023-02-28/29341.html", "primary": true },
+        { "label": "PDF 全文", "url": "https://www.szftzy.cn/attachment/0/77/77799/1199694.pdf", "primary": true },
+        { "label": "深圳大学转载", "url": "https://kjb.szu.edu.cn/info/1146/6825.htm", "primary": false }
+      ],
+      "keyClauses": [
+        { "clause": "第三十三条", "summary": "自愿签署 IC；无法书面时口头 IC 须录音录像" },
+        { "clause": "第三十四条", "summary": "无/限制民事行为能力者须监护人书面 IC + 可理解范围内告知本人" },
+        { "clause": "第三十五条", "summary": "IC 信息充分完整，以可理解语言文字/视频表述" },
+        { "clause": "第三十六条", "summary": "IC 书七类必备内容（目的、风险获益、权利、补偿等）" },
+        { "clause": "第三十七条", "summary": "逐项说明；给予充分时间理解后再决定" },
+        { "clause": "第三十八条", "summary": "方案变更、新风险等须再次 IC" }
+      ],
+      "terminology": ["研究参与者", "知情同意书", "伦理审查委员会"]
+    },
+    {
+      "id": "ethics-2016",
+      "title": "涉及人的生物医学研究伦理审查办法",
+      "shortTitle": "伦理审查办法 2016",
+      "category": "ethics",
+      "issuer": "原国家卫生计生委",
+      "docNumber": "第11号令",
+      "status": "active",
+      "statusLabel": "仍有效力（部分场景被2023办法扩展）",
+      "effectiveFrom": "2016-12-01",
+      "effectiveUntil": null,
+      "priority": "secondary",
+      "projectRole": "医疗卫生机构生物医学研究 IC 专章；本地 PDF 对应此版",
+      "localFile": "../标准资料/涉及人的生物医学研究伦理审查办法.pdf",
+      "localFileLabel": "本地 PDF（扫描件）",
+      "links": [
+        { "label": "中国政府网", "url": "https://www.gov.cn/zhengce/2016-10/12/content_5713806.htm", "primary": true },
+        { "label": "国家卫健委", "url": "https://www.nhc.gov.cn/wjw/c100174/201610/b6a9508b727d47babce2a0855d274a0c.shtml", "primary": true },
+        { "label": "国务院公报", "url": "https://www.gov.cn/gongbao/content/2017/content_5227817.htm", "primary": false }
+      ],
+      "keyClauses": [
+        { "clause": "第十八条", "summary": "知情同意原则：尊重自主，禁止欺骗利诱胁迫，可随时退出" },
+        { "clause": "第三十三条至三十八条", "summary": "知情同意获取与再次同意（与2023版结构类似）" },
+        { "clause": "第二十条", "summary": "伦理审查重点含 IC 信息完整性与获取过程合规" }
+      ],
+      "terminology": ["受试者", "伦理委员会"]
+    },
+    {
+      "id": "tcgcpu-024-2023",
+      "title": "临床试验人员培训管理规范",
+      "shortTitle": "T/CGCPU 024-2023",
+      "category": "training",
+      "issuer": "中关村玖泰药物临床试验技术创新联盟",
+      "docNumber": "T/CGCPU 024-2023",
+      "status": "active",
+      "statusLabel": "团体标准现行",
+      "effectiveFrom": "2023-01-10",
+      "effectiveUntil": null,
+      "priority": "reference",
+      "projectRole": "培训管理与评估框架；不替代沟通评分对照表",
+      "localFile": null,
+      "localFileLabel": null,
+      "links": [
+        { "label": "国家标准馆", "url": "https://www.ndls.org.cn/standard/detail/d9027411881c6c612ede52a7c6d2fc74", "primary": true },
+        { "label": "Antpedia 标准页", "url": "https://www.antpedia.com/standard/1005922486.html", "primary": false }
+      ],
+      "keyClauses": [
+        { "clause": "第4章", "summary": "评估内容" },
+        { "clause": "附录A", "summary": "临床试验人员培训管理评估内容（规范性）" },
+        { "clause": "第7章", "summary": "结果判定与评估结论" }
+      ],
+      "terminology": ["临床试验机构", "培训管理"]
+    },
+    {
+      "id": "ic-policy-2020",
+      "title": "我国药物临床试验知情同意政策的变迁",
+      "shortTitle": "知情同意政策解读 2020",
+      "category": "reference",
+      "issuer": "王美霞, 李义庭 / 《医学与哲学》",
+      "docNumber": "2020;41(15):12-19",
+      "status": "active",
+      "statusLabel": "参考文献",
+      "effectiveFrom": "2020-01-01",
+      "effectiveUntil": null,
+      "priority": "reference",
+      "projectRole": "理解 2003→2020 GCP 知情同意条款变化；编写评分项背景说明",
+      "localFile": null,
+      "localFileLabel": null,
+      "links": [
+        { "label": "大连医科大学期刊页", "url": "https://yizhe.dmu.edu.cn/article/doi/10.12014/j.issn.1002-0772.2020.15.03", "primary": true },
+        { "label": "DOI", "url": "https://doi.org/10.12014/j.issn.1002-0772.2020.15.03", "primary": false }
+      ],
+      "keyClauses": [
+        { "clause": "全文", "summary": "对比 GCP 2003/2020 知情同意概念、内容、过程、签署人员等变化" }
+      ],
+      "terminology": ["知情同意", "GCP"]
+    }
+  ]
+}

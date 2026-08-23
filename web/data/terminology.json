@@ -1,0 +1,16 @@
+{
+  "terms": [
+    { "term": "试验参与者 / 受试者", "definition": "参加临床试验、接受试验用药品的个体", "sources": ["gcp-2020", "gcp-2026"], "field": "participant" },
+    { "term": "知情同意（IC）", "definition": "告知可影响参加决定的信息后，自愿确认同意的过程；须书面 ICF 证明", "sources": ["gcp-2020", "gcp-2026", "helsinki-2024"], "field": "informed_consent" },
+    { "term": "知情同意书（ICF）", "definition": "经伦理审查委员会批准的信息载体", "sources": ["gcp-2020", "gcp-2026"], "field": "icf" },
+    { "term": "法定代理人 / 监护人", "definition": "无/限制民事行为能力参与者由其代为或共同知情同意", "sources": ["gcp-2020", "ethics-2023"], "field": "guardian" },
+    { "term": "公正见证人", "definition": "与试验无关，见证无阅读能力者整个 IC 过程", "sources": ["gcp-2020", "gcp-2026"], "field": "impartial_witness" },
+    { "term": "弱势受试者/参与者", "definition": "维护自身意愿能力不足，易被获益/报复不当影响", "sources": ["gcp-2020"], "field": "vulnerable" },
+    { "term": "不良事件（AE）", "definition": "接受试验用药品后出现的所有不良医学事件，未必有因果关系", "sources": ["gcp-2020"], "field": "ae" },
+    { "term": "严重不良事件（SAE）", "definition": "死亡、危及生命、住院/延长住院、永久残疾等", "sources": ["gcp-2020"], "field": "sae" },
+    { "term": "依从性", "definition": "参与各方遵守试验方案、GCP 及法律法规", "sources": ["gcp-2020", "gcp-2026"], "field": "adherence" },
+    { "term": "随访", "definition": "试验期间及结束后对参与者状态、AE、用药等的持续联系与医疗安排", "sources": ["gcp-2020"], "field": "follow_up" },
+    { "term": "主要研究者（PI）", "definition": "试验现场最终责任人；关键决策原则上不得授权", "sources": ["gcp-2026"], "field": "pi" },
+    { "term": "伦理审查委员会", "definition": "2020 版称伦理委员会；审查并保护权益安全", "sources": ["gcp-2020", "gcp-2026"], "field": "irb" }
+  ]
+}

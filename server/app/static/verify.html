@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>数据库与 Agnes 接入验证</title>
+  <style>
+    :root {
+      --bg: #f4f7f6;
+      --card: #fff;
+      --text: #0f172a;
+      --muted: #64748b;
+      --ok: #059669;
+      --bad: #dc2626;
+      --line: #e2e8f0;
+      --accent: #0f766e;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: linear-gradient(180deg, #e8f5f2 0%, var(--bg) 40%);
+      color: var(--text);
+      padding: 32px 20px 64px;
+    }
+    .wrap { max-width: 920px; margin: 0 auto; }
+    h1 { margin: 0 0 8px; font-size: 28px; }
+    .sub { color: var(--muted); margin-bottom: 24px; line-height: 1.6; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 20px 22px;
+      margin-bottom: 16px;
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
+    }
+    .row { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0; }
+    button {
+      border: 0;
+      border-radius: 10px;
+      padding: 10px 16px;
+      background: var(--accent);
+      color: #fff;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button.secondary { background: #fff; color: var(--accent); border: 1px solid var(--accent); }
+    button:disabled { opacity: 0.6; cursor: wait; }
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .badge.ok { background: #d1fae5; color: var(--ok); }
+    .badge.bad { background: #fee2e2; color: var(--bad); }
+    pre {
+      background: #0b1220;
+      color: #e2e8f0;
+      padding: 14px;
+      border-radius: 10px;
+      overflow: auto;
+      font-size: 12px;
+      line-height: 1.5;
+      max-height: 420px;
+    }
+    code { background: #eef2ff; padding: 2px 6px; border-radius: 4px; font-size: 13px; }
+    .links a { color: var(--accent); margin-right: 12px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { text-align: left; padding: 8px; border-bottom: 1px solid var(--line); }
+    th { color: var(--muted); font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>数据库与 Agnes AI 接入验证</h1>
+    <p class="sub">
+      本页用于展示：SQLite 数据库已创建并灌入标准/病例数据；点击按钮可真实调用 Agnes API，并把结果写入
+      <code>ai_generation_log</code>。密钥仅存在服务器 <code>.env</code>，页面只显示脱敏值。
+    </p>
+
+    <div class="card">
+      <div>状态：<span id="status" class="badge">检测中</span></div>
+      <div class="row">
+        <button id="btn-db" type="button">刷新数据库验证</button>
+        <button id="btn-probe" class="secondary" type="button">写入探针</button>
+        <button id="btn-ai" type="button">调用 Agnes 并写库</button>
+      </div>
+      <div class="links">
+        <a href="/api/db/verify" target="_blank">/api/db/verify</a>
+        <a href="/docs" target="_blank">/docs</a>
+        <a href="/health" target="_blank">/health</a>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>摘要</h3>
+      <div id="summary">—</div>
+    </div>
+
+    <div class="card">
+      <h3>表行数</h3>
+      <div id="counts"></div>
+    </div>
+
+    <div class="card">
+      <h3>原始 JSON</h3>
+      <pre id="raw">等待请求…</pre>
+    </div>
+  </div>
+
+  <script>
+    const statusEl = document.getElementById("status");
+    const summaryEl = document.getElementById("summary");
+    const countsEl = document.getElementById("counts");
+    const rawEl = document.getElementById("raw");
+
+    function setBusy(b) {
+      ["btn-db", "btn-probe", "btn-ai"].forEach((id) => {
+        document.getElementById(id).disabled = b;
+      });
+    }
+
+    function renderCounts(counts) {
+      const entries = Object.entries(counts || {}).sort((a, b) => a[0].localeCompare(b[0]));
+      countsEl.innerHTML = `<table><thead><tr><th>表</th><th>行数</th></tr></thead><tbody>
+        ${entries.map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join("")}
+      </tbody></table>`;
+    }
+
+    async function refreshDb() {
+      setBusy(true);
+      try {
+        const res = await fetch("/api/db/verify");
+        const data = await res.json();
+        statusEl.textContent = data.ok ? "数据库 OK" : "数据库异常";
+        statusEl.className = "badge " + (data.ok ? "ok" : "bad");
+        summaryEl.innerHTML = `
+          <p><strong>${data.message}</strong></p>
+          <p>数据库文件：<code>${data.database_file}</code></p>
+          <p>默认病例：<code>${data.samples?.case?.case_code || "—"}</code>
+            · ${data.samples?.case?.short_title || ""}
+            · ${data.samples?.case?.data_status || ""}</p>
+          <p>最近 AI 日志条数：${(data.samples?.recent_ai_logs || []).length}</p>
+        `;
+        renderCounts(data.table_counts);
+        rawEl.textContent = JSON.stringify(data, null, 2);
+      } catch (e) {
+        statusEl.textContent = "请求失败";
+        statusEl.className = "badge bad";
+        rawEl.textContent = String(e);
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    async function probe() {
+      setBusy(true);
+      try {
+        const res = await fetch("/api/db/probe", { method: "POST" });
+        const data = await res.json();
+        rawEl.textContent = JSON.stringify(data, null, 2);
+        await refreshDb();
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    async function aiPing() {
+      setBusy(true);
+      statusEl.textContent = "正在调用 Agnes…";
+      statusEl.className = "badge";
+      try {
+        const res = await fetch("/api/ai/ping", { method: "POST" });
+        const data = await res.json();
+        statusEl.textContent = data.ok ? "Agnes + 写库 OK" : "Agnes 失败";
+        statusEl.className = "badge " + (data.ok ? "ok" : "bad");
+        summaryEl.innerHTML = `
+          <p><strong>${data.message}</strong></p>
+          <p>模型：<code>${data.model}</code> · 密钥：<code>${data.api_key_masked}</code></p>
+          <p>耗时：${data.latency_ms ?? "—"} ms</p>
+          <p>回复：${data.content || data.error || "—"}</p>
+          <p>generation_id：<code>${data.persisted?.generation_id || "—"}</code></p>
+        `;
+        rawEl.textContent = JSON.stringify(data, null, 2);
+        const verify = await fetch("/api/db/verify").then((r) => r.json());
+        renderCounts(verify.table_counts);
+      } catch (e) {
+        statusEl.textContent = "请求失败";
+        statusEl.className = "badge bad";
+        rawEl.textContent = String(e);
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    document.getElementById("btn-db").onclick = refreshDb;
+    document.getElementById("btn-probe").onclick = probe;
+    document.getElementById("btn-ai").onclick = aiPing;
+    refreshDb();
+  </script>
+</body>
+</html>
