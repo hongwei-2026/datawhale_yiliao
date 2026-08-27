@@ -14,12 +14,14 @@ DISCLAIMER = (
     "AI 与系统评分可能有误或遗漏。真正的专业提升，仍取决于真实场景中与人打交道的实践，以及带教指导。"
 )
 
-# 禁止项启发式
+# 禁止项启发式（IC + FU）
 PROHIBITION_RULES = {
     "IC-X01": [r"不签(就)?(不|没)", r"必须参加", r"强迫", r"利诱", r"给你好处.*必须"],
     "IC-X02": [r"一定(能)?(治好|好|有效)", r"肯定(有效|没事|安全)", r"绝对(安全|有效)", r"包治", r"没有副作用", r"一点事都没有"],
     "IC-X04": [r"不签.*(不给|不好好|不理)", r"不参加.*(影响|不给).*治"],
     "IC-X05": [r"出了事.*自负", r"医院不负责", r"放弃.*权利", r"免责"],
+    "FU-X01": [r"为什么不按要求", r"怎么能不", r"不能继续参加", r"责备", r"补助.*没了"],
+    "FU-X02": [r"你就(停|停掉|补服|加服)", r"自己决定.*停药", r"不用再联系"],
 }
 
 # 内容/过程覆盖关键词（弱信号）
@@ -42,6 +44,20 @@ COVERAGE_HINTS = {
     "IC-C12": [r"新信息", r"再告知", r"有情况.*联系"],
     "IC-C13": [r"电话", r"联系", r"伦理委员会"],
     "IC-P10": [r"副本", r"复印件", r"一份给你"],
+    "CC-01": [r"退出", r"可以不参加", r"随时.*停", r"不愿意"],
+    "CC-02": [r"不一定", r"可能无效", r"安慰剂", r"不保证.*有效", r"未必"],
+    "CC-03": [r"副作用", r"风险", r"不适", r"不良反应", r"可能.*不舒服"],
+    "FU-A01": [r"漏服", r"忘记", r"没吃", r"第\d+天", r"整天.*没有"],
+    "FU-A02": [r"头晕", r"发飘", r"头轻", r"不舒服", r"第18"],
+    "FU-A03": [r"其他药", r"合并用药", r"感冒药", r"氨氯地平", r"OTC", r"保健品"],
+    "FU-A04": [r"药盒", r"剩.*片", r"35片", r"10片", r"7片"],
+    "FU-A05": [r"日记", r"补记", r"补写", r"本子"],
+    "FU-A06": [r"血压", r"家庭.*测", r"记录"],
+    "FU-P01": [r"联系.*中心", r"打电话", r"不必.*特别严重", r"及时联系"],
+    "FU-P02": [r"先联系", r"不要自己", r"自行.*加", r"补服"],
+    "FU-P03": [r"下次.*随访", r"联系电话", r"预约"],
+    "FU-C01": [r"不是.*责怪", r"了解情况", r"真实情况", r"不用紧张", r"一起.*看"],
+    "FU-C02": [r"哪一天", r"具体", r"第\d+天", r"往前"],
 }
 
 
@@ -55,7 +71,7 @@ def _find_quote(messages: list[dict], patterns: list[str]) -> dict | None:
             continue
         for p in patterns:
             if re.search(p, m["content"]):
-                return {"turn_index": m["turn_index"], "role": "trainee", "quote": m["content"][:160]}
+                return {"turn_index": m.get("turn_index"), "role": "trainee", "quote": m["content"][:160]}
     return None
 
 
@@ -66,7 +82,7 @@ def rule_pass(messages: list[dict], items: list[dict]) -> dict[str, dict]:
     for item in items:
         code = item["id"]
         # 禁止项
-        if code in PROHIBITION_RULES:
+        if code in PROHIBITION_RULES or item.get("hardFail") or item["type"] == "prohibition":
             quote = _find_quote(messages, PROHIBITION_RULES[code])
             if quote:
                 out[code] = {
@@ -127,7 +143,7 @@ def _extract_json(text: str) -> Any:
 
 def llm_judge(client: AgnesClient, messages: list[dict], items: list[dict]) -> dict[str, dict]:
     transcript = "\n".join(
-        f"[{m['turn_index']}]{'研究者' if m['role']=='trainee' else '受试者' if m['role']=='patient' else m['role']}: {m['content']}"
+        f"[{m.get('turn_index', '?')}]{'研究者' if m['role']=='trainee' else '受试者' if m['role']=='patient' else m['role']}: {m['content']}"
         for m in messages
         if m["role"] in ("trainee", "patient")
     )
@@ -235,7 +251,7 @@ def merge_scores(items: list[dict], rule: dict[str, dict], llm: dict[str, dict])
             continue
 
         # 禁止项：规则 fail 优先
-        if item["type"] == "prohibition" or code.startswith("IC-X"):
+        if item["type"] == "prohibition" or code.startswith("IC-X") or code.startswith("FU-X"):
             if r.get("verdict") == "fail":
                 verdict, spans, comment, st = "fail", r.get("evidence_spans") or [], r.get("comment"), "hybrid"
             elif llm_hit.get("verdict") == "fail":
@@ -280,11 +296,129 @@ def merge_scores(items: list[dict], rule: dict[str, dict], llm: dict[str, dict])
     return merged
 
 
+def _item_dimension(item: dict) -> str:
+    if item.get("dimension"):
+        return item["dimension"]
+    if item.get("hardFail") or item.get("type") == "prohibition":
+        return "redline"
+    if item.get("type") == "concern":
+        return "concern"
+    layer = item.get("layer") or "L1"
+    if layer == "communication":
+        return "communication"
+    return layer
+
+
+def compute_numeric_scores(results: list[dict], rubric: dict, agg: dict) -> dict[str, Any]:
+    """按维度计算 0–100 练习参考分（非能力认证）。"""
+    model = rubric.get("meta", {}).get("scoringModel") or {}
+    dims = model.get("dimensions") or []
+    vpoints = model.get("verdictPoints") or {"pass": 1.0, "uncertain": 0.5, "fail": 0.0}
+    pass_score = int(model.get("passScore") or 60)
+    item_map = {i["id"]: i for i in rubric.get("items", [])}
+
+    dimension_detail: dict[str, Any] = {}
+    for dim in dims:
+        dim_id = dim["id"]
+        if dim.get("isGate"):
+            hard_fails = [r for r in results if r.get("hard_fail") and r["verdict"] == "fail"]
+            dimension_detail[dim_id] = {
+                "name": dim.get("name") or dim_id,
+                "score": 0 if hard_fails else 100,
+                "passed": len(hard_fails) == 0,
+                "fail_count": len(hard_fails),
+            }
+            continue
+
+        rows = [
+            r for r in results
+            if _item_dimension(item_map.get(r["item_code"], {})) == dim_id and r["verdict"] != "skipped"
+        ]
+        if not rows:
+            dimension_detail[dim_id] = {
+                "name": dim.get("name") or dim_id,
+                "score": 100,
+                "passed": True,
+                "earned": 0,
+                "max": 0,
+                "item_count": 0,
+            }
+            continue
+
+        earned = 0.0
+        max_pts = 0.0
+        for r in rows:
+            w = float(item_map.get(r["item_code"], {}).get("weight") or 1.0)
+            max_pts += vpoints.get("pass", 1.0) * w
+            earned += vpoints.get(r["verdict"], 0.0) * w
+        score = round(100 * earned / max_pts) if max_pts else 100
+        dimension_detail[dim_id] = {
+            "name": dim.get("name") or dim_id,
+            "score": score,
+            "passed": score >= pass_score,
+            "earned": round(earned, 2),
+            "max": round(max_pts, 2),
+            "item_count": len(rows),
+        }
+
+    weighted = [d for d in dims if not d.get("isGate") and float(d.get("weight") or 0) > 0]
+    weight_sum = sum(float(d["weight"]) for d in weighted)
+    if weight_sum:
+        total_score = round(
+            sum(dimension_detail[d["id"]]["score"] * float(d["weight"]) for d in weighted) / weight_sum
+        )
+    else:
+        total_score = 100
+
+    redline_ok = dimension_detail.get("redline", {}).get("passed", True)
+    checklist_pass = agg.get("overall_pass", False)
+    practice_pass = redline_ok and total_score >= pass_score and checklist_pass
+
+    if total_score >= 85:
+        grade_label = "优秀（练习参考）"
+    elif total_score >= pass_score:
+        grade_label = "达标（练习参考）"
+    elif total_score >= 40:
+        grade_label = "需改进（练习参考）"
+    else:
+        grade_label = "未达标（练习参考）"
+
+    return {
+        "total_score": total_score,
+        "pass_score": pass_score,
+        "grade_label": grade_label,
+        "practice_pass": practice_pass,
+        "redline_ok": redline_ok,
+        "checklist_pass": checklist_pass,
+        "dimensions": dimension_detail,
+        "note": "练习参考分，非正式能力认证或合规结论",
+    }
+
+
+def recompute_scores_from_rows(rows: list[dict], rubric: dict) -> dict[str, Any]:
+    """从已入库的 score_result 行重算练习参考分（补旧反馈缺 scores_json）。"""
+    item_map = {i["id"]: i for i in rubric.get("items", [])}
+    results: list[dict] = []
+    for row in rows:
+        meta = item_map.get(row["item_code"]) or {}
+        results.append(
+            {
+                "item_code": row["item_code"],
+                "verdict": row["verdict"],
+                "layer": meta.get("layer"),
+                "type": meta.get("type"),
+                "hard_fail": bool(meta.get("hardFail")),
+            }
+        )
+    agg = aggregate(results)
+    return compute_numeric_scores(results, rubric, agg)
+
+
 def aggregate(results: list[dict]) -> dict:
     l1 = [r for r in results if r["layer"] == "L1" and r["verdict"] != "skipped"]
     hard_fails = [r for r in results if r.get("hard_fail") and r["verdict"] == "fail"]
+    concern = [r for r in results if r.get("type") == "concern" and r["verdict"] != "skipped"]
     overall = len(hard_fails) == 0 and all(r["verdict"] == "pass" for r in l1)
-    # uncertain 导致练习未过线，但文案说明存疑
     has_uncertain = any(r["verdict"] == "uncertain" for r in l1)
     return {
         "overall_pass": overall,
@@ -293,8 +427,10 @@ def aggregate(results: list[dict]) -> dict:
         "l1_pass": sum(1 for r in l1 if r["verdict"] == "pass"),
         "l1_fail": sum(1 for r in l1 if r["verdict"] == "fail"),
         "l1_uncertain": sum(1 for r in l1 if r["verdict"] == "uncertain"),
+        "concern_total": len(concern),
+        "concern_pass": sum(1 for r in concern if r["verdict"] == "pass"),
         "hard_fail_count": len(hard_fails),
-        "pass_rule": "L1 全部通过且无 IC-X 违规（练习通过线，非真实能力认证）",
+        "pass_rule": "L1 全部 pass + 无红线 fail（清单线）；另有 0–100 练习参考分",
     }
 
 
@@ -317,8 +453,8 @@ def build_feedback(results: list[dict], agg: dict, client: AgnesClient | None = 
 
     # 可选：LLM 润色总述
     summary = (
-        f"练习通过线：{'达到' if agg['overall_pass'] else '未达到'}。"
-        f" L1 通过 {agg['l1_pass']}/{agg['l1_total']}。"
+        f"练习参考分 {agg.get('scores', {}).get('total_score', '—')}/100（{agg.get('scores', {}).get('grade_label', '')}）。"
+        f" 清单线：{'达到' if agg['overall_pass'] else '未达到'}（L1 {agg['l1_pass']}/{agg['l1_total']}）。"
         " 以下为系统建议，仅供参考。"
     )
     if client and client.configured and failed:
@@ -347,17 +483,19 @@ def build_feedback(results: list[dict], agg: dict, client: AgnesClient | None = 
             pass
 
     return {
-        "overall_pass": agg["overall_pass"],
+        "overall_pass": agg.get("scores", {}).get("practice_pass", agg["overall_pass"]),
+        "checklist_pass": agg["overall_pass"],
         "summary": summary,
         "aggregate": agg,
+        "scores": agg.get("scores"),
         "improvements": improvements,
         "disclaimer": DISCLAIMER,
         "items": results,
     }
 
 
-def run_scoring(client: AgnesClient, messages: list[dict]) -> dict:
-    rubric = load_rubric()
+def run_scoring(client: AgnesClient, messages: list[dict], scene_key: str = "informed_consent") -> dict:
+    rubric = load_rubric(scene_key)
     items = rubric["items"]
     enabled = [i for i in items if i.get("enabledMvp")]
     rule = rule_pass(messages, enabled)
@@ -366,5 +504,7 @@ def run_scoring(client: AgnesClient, messages: list[dict]) -> dict:
         llm = llm_judge(client, messages, enabled)
     results = merge_scores(items, rule, llm)
     agg = aggregate(results)
+    scores = compute_numeric_scores(results, rubric, agg)
+    agg["scores"] = scores
     report = build_feedback(results, agg, client)
-    return {"results": results, "aggregate": agg, "report": report, "llm_meta": llm.get("__error__")}
+    return {"results": results, "aggregate": agg, "report": report, "llm_meta": llm.get("__error__"), "scores": scores}

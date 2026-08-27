@@ -13,7 +13,8 @@ from pydantic import BaseModel, Field
 from . import sessions as session_svc
 from .agnes import AgnesClient
 from .config import get_settings
-from .db import connect, get_meta, new_id, set_meta, table_counts, utc_now
+from .db import connect, get_meta, init_schema, migrate_schema, new_id, set_meta, table_counts, utc_now
+from .minimax_tts import MiniMaxTTS
 from .seed import seed
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -92,6 +93,10 @@ async def lifespan(app: FastAPI):
     app.state.db_path = str(db_path)
     app.state.settings = settings
     seed(app.state.db_path)
+    conn = connect(app.state.db_path)
+    init_schema(conn)
+    conn.close()
+    session_svc.backfill_missing_scores(app.state.db_path)
     yield
 
 
@@ -156,7 +161,7 @@ def api_root():
     return {
         "service": "sp-training-api",
         "site": "/",
-        "database_page": "/#database",
+        "database_page": "/#explain-database",
         "docs": "/docs",
         "verify_api": "/api/db/verify",
         "ai_ping": "/api/ai/ping",
@@ -169,14 +174,46 @@ def health():
     conn = db()
     counts = table_counts(conn)
     conn.close()
+    tts = MiniMaxTTS(settings)
     return {
         "ok": True,
         "database_file": app.state.db_path,
         "agnes_configured": AgnesClient(settings).configured,
         "agnes_model": settings.agnes_model,
         "api_key_masked": settings.api_key_masked,
+        "minimax_configured": tts.configured,
+        "minimax_key_masked": settings.minimax_key_masked,
+        "minimax_tts_model": settings.minimax_tts_model,
         "table_count": len(counts),
     }
+
+
+class TtsBody(BaseModel):
+    text: str = Field(min_length=1, max_length=800)
+
+
+@app.get("/api/voice/status")
+def api_voice_status():
+    settings = app.state.settings
+    tts = MiniMaxTTS(settings)
+    return {
+        "ok": True,
+        "configured": tts.configured,
+        "api_key_masked": settings.minimax_key_masked,
+        "model": settings.minimax_tts_model,
+        "voice_id": settings.minimax_voice_id,
+        "stt": "browser_web_speech",
+        "note": "受试者旁白用 MiniMax TTS；你的说话用浏览器语音识别，便于低延迟与打断。",
+    }
+
+
+@app.post("/api/voice/tts")
+def api_voice_tts(body: TtsBody):
+    tts = MiniMaxTTS(app.state.settings)
+    result = tts.synthesize(body.text)
+    if not result.get("ok"):
+        raise HTTPException(400, result.get("error") or "语音合成失败")
+    return result
 
 
 @app.get("/api/db/verify")
@@ -461,7 +498,7 @@ def default_case():
 @app.get("/verify")
 def verify_page():
     """旧验证页入口：跳转到网站「数据库」页。"""
-    return RedirectResponse(url="/#database", status_code=307)
+    return RedirectResponse(url="/#explain-database", status_code=307)
 
 
 @app.get("/verify/legacy", response_class=HTMLResponse)
@@ -487,6 +524,12 @@ class TurnBody(BaseModel):
     content: str = Field(min_length=1, max_length=4000)
 
 
+@app.get("/api/sessions/history")
+def api_session_history(limit: int = 20):
+    sessions = session_svc.list_sessions(app.state.db_path, limit=limit)
+    return {"ok": True, "sessions": sessions}
+
+
 @app.post("/api/sessions")
 def api_create_session(body: CreateSessionBody | None = None):
     body = body or CreateSessionBody()
@@ -504,6 +547,7 @@ def api_get_session(session_id: str):
             "id": sess["id"],
             "case_code": sess["case_code"],
             "case_version": sess["case_version"],
+            "persona_code": sess.get("persona_code"),
             "status": sess["status"],
             "started_at": sess["started_at"],
             "ended_at": sess["ended_at"],

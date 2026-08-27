@@ -368,7 +368,7 @@
   ],
   "persona": {
     "persona_id": "PER-ELDER-BASIC-01",
-    "display_name": "基本老年受试者（占位）",
+    "display_name": "张大爷",
     "age_band": "65-74",
     "age_years": 68,
     "sex": "male",

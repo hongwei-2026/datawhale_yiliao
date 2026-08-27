@@ -10,7 +10,14 @@ ROOT = Path(__file__).resolve().parents[2]
 CASES_DIR = ROOT / "web" / "data" / "cases"
 INDEX_PATH = ROOT / "web" / "data" / "cases-index.json"
 RUBRIC_PATH = ROOT / "web" / "data" / "scoring-rubric.json"
+RUBRIC_FOLLOWUP_PATH = ROOT / "web" / "data" / "scoring-rubric-followup.json"
 RUBRIC_LAY_PATH = ROOT / "web" / "data" / "rubric-layperson.json"
+
+RUBRIC_BY_SCENE = {
+    "informed_consent": RUBRIC_PATH,
+    "follow_up": RUBRIC_FOLLOWUP_PATH,
+    "adherence": RUBRIC_FOLLOWUP_PATH,
+}
 
 
 @lru_cache
@@ -19,8 +26,9 @@ def load_cases_index() -> dict:
 
 
 @lru_cache
-def load_rubric() -> dict:
-    return json.loads(RUBRIC_PATH.read_text(encoding="utf-8"))
+def load_rubric(scene_key: str = "informed_consent") -> dict:
+    path = RUBRIC_BY_SCENE.get(scene_key, RUBRIC_PATH)
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 @lru_cache
@@ -30,23 +38,43 @@ def load_rubric_lay() -> dict:
 
 def default_case_id() -> str:
     idx = load_cases_index()
+    return idx.get("meta", {}).get("default_case_id") or idx["cases"][0]["case_id"]
+
+
+def resolve_case_file(case_id: str) -> Path:
+    path = CASES_DIR / f"{case_id}.json"
+    if path.exists():
+        return path
+    idx = load_cases_index()
+    for d in idx.get("diseases", []):
+        for c in d.get("cases", []):
+            if c.get("case_id") == case_id and c.get("file"):
+                return ROOT / "web" / "data" / c["file"]
+            for p in c.get("personas", []):
+                f = p.get("file") or ""
+                if f.endswith(f"{case_id}.json") or case_id in f:
+                    return ROOT / "web" / "data" / f
     for c in idx.get("cases", []):
-        if c.get("is_default"):
-            return c["case_id"]
-    return idx["cases"][0]["case_id"]
+        if c["case_id"] == case_id and c.get("file"):
+            return ROOT / "web" / "data" / c["file"]
+    return path
 
 
 @lru_cache
 def load_case(case_id: str | None = None) -> dict:
     cid = case_id or default_case_id()
-    path = CASES_DIR / f"{cid}.json"
-    if not path.exists():
-        # fallback via index file field
-        for c in load_cases_index().get("cases", []):
-            if c["case_id"] == cid:
-                path = ROOT / "web" / "data" / c["file"]
-                break
+    path = resolve_case_file(cid)
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def case_primary_scene(case: dict) -> str:
+    script = case.get("session_script") or {}
+    if script.get("scene_key"):
+        return script["scene_key"]
+    binding = next((b for b in case.get("scene_bindings", []) if b.get("enabled")), None)
+    if binding:
+        return binding.get("scene_key") or "informed_consent"
+    return "informed_consent"
 
 
 def case_fact_digest(case: dict) -> dict:
@@ -64,10 +92,10 @@ def case_fact_digest(case: dict) -> dict:
         for s in case.get("symptoms", [])
         if s.get("is_core") or s.get("present")
     ]
-    return {
+    digest = {
         "case_id": meta["case_id"],
         "title": meta["short_title"],
-        "disclaimer": "教学模拟占位病例",
+        "disclaimer": "教学模拟病例",
         "clinical": case.get("clinical_summary", {}),
         "symptoms": symptoms,
         "risks_patient_may_worry": [
@@ -80,6 +108,7 @@ def case_fact_digest(case: dict) -> dict:
             for f in case.get("forbidden_fabrications", [])
         ],
         "persona": {
+            "name": persona.get("display_name"),
             "age_band": persona.get("age_band"),
             "sex": persona.get("sex"),
             "emotion": persona.get("emotion_baseline"),
@@ -88,3 +117,18 @@ def case_fact_digest(case: dict) -> dict:
         },
         "medication_brief": (case.get("medication") or {}).get("current_regimen_summary"),
     }
+    if case.get("adherence_facts"):
+        digest["adherence_facts"] = case["adherence_facts"]
+    if case.get("concomitant_events"):
+        digest["concomitant_events"] = [
+            {"id": e.get("event_id"), "type": e.get("type"), "summary": e.get("drug_name") or e.get("context")}
+            for e in case["concomitant_events"]
+        ]
+    if case.get("key_concerns"):
+        digest["key_concerns"] = [
+            {"topic": k.get("topic"), "rule": k.get("disclosure_rule")}
+            for k in case["key_concerns"]
+        ]
+    if case.get("dialogue_hints"):
+        digest["dialogue_hints"] = case["dialogue_hints"]
+    return digest

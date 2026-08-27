@@ -1,9 +1,81 @@
 {
   "meta": {
-    "schema_version": "1.0.0",
+    "schema_version": "1.2.0",
     "default_case_id": "CASE-T2DM-PH2-001",
-    "note": "病例目录；完整包见 cases/*.json。占位数据待正式临床内容替换。"
+    "default_persona_id": "PER-ELDER-BASIC-01",
+    "note": "三层结构：疾病 → 试验病例 → 受试者。高血压案例源自飞书 SP 案例本地化。"
   },
+  "diseases": [
+    {
+      "disease_code": "T2DM",
+      "name_zh": "2型糖尿病",
+      "icd10": "E11",
+      "summary": "1 个 II 期知情同意试验 · 2 位受试者",
+      "cases": [
+        {
+          "case_id": "CASE-T2DM-PH2-001",
+          "short_title": "II期知情同意",
+          "title": "2型糖尿病口服降糖新药 II 期试验 · 知情同意",
+          "data_status": "placeholder",
+          "version": "0.1.0",
+          "phase": "II",
+          "mvp_scenes": ["S1"],
+          "file": "cases/CASE-T2DM-PH2-001.json",
+          "one_liner": "口服降糖新药 II 期，知情同意沟通练习",
+          "personas": [
+            {
+              "persona_id": "PER-ELDER-BASIC-01",
+              "display_label": "张大爷 · 68岁男",
+              "one_liner": "退休男性，说话偏慢，会反复确认退出权和疗效",
+              "file": "cases/CASE-T2DM-PH2-001.json",
+              "is_default": true,
+              "is_trainable": true,
+              "data_status": "placeholder"
+            },
+            {
+              "persona_id": "PER-ELDER-FEMALE-02",
+              "display_label": "王阿姨 · 72岁女",
+              "one_liner": "与女儿同住，听力略差，反复问退出权、副作用和脚麻视力",
+              "file": "cases/CASE-T2DM-PH2-002.json",
+              "is_default": false,
+              "is_trainable": true,
+              "data_status": "reviewed"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "disease_code": "HTN",
+      "name_zh": "高血压",
+      "icd10": "I10",
+      "summary": "1 个 III 期第4周随访 SP 案例 · 1 位受试者",
+      "cases": [
+        {
+          "case_id": "CASE-HTN-PH3-W4-001",
+          "short_title": "III期 · 第4周随访",
+          "title": "原发性高血压 III 期试验 · 第4周门诊随访",
+          "data_status": "reviewed",
+          "version": "1.0.0",
+          "phase": "III",
+          "mvp_scenes": ["S4", "S5"],
+          "file": "cases/CASE-HTN-PH3-W4-001.json",
+          "one_liner": "56岁出租车司机李建国，随访：依从性、AE、合并用药、血压记录",
+          "personas": [
+            {
+              "persona_id": "PER-HTN-TAXI-01",
+              "display_label": "李建国 · 56岁男",
+              "one_liner": "出租车司机，愿意配合但担心被批评，会隐瞒漏服和自行加药",
+              "file": "cases/CASE-HTN-PH3-W4-001.json",
+              "is_default": true,
+              "is_trainable": true,
+              "data_status": "reviewed"
+            }
+          ]
+        }
+      ]
+    }
+  ],
   "cases": [
     {
       "case_id": "CASE-T2DM-PH2-001",
@@ -13,9 +85,39 @@
       "version": "0.1.0",
       "disease_code": "T2DM",
       "is_default": true,
+      "primary_scene": "informed_consent",
       "mvp_scenes": ["S1"],
       "file": "cases/CASE-T2DM-PH2-001.json",
-      "one_liner": "68岁男性，血糖控制欠佳，拟参加口服降糖新药试验的知情同意沟通（教学占位数据）。"
+      "one_liner": "68岁男性，血糖控制欠佳，拟参加口服降糖新药试验的知情同意沟通。",
+      "default_persona_id": "PER-ELDER-BASIC-01"
+    },
+    {
+      "case_id": "CASE-T2DM-PH2-002",
+      "short_title": "2型糖尿病 · II期知情同意",
+      "title": "2型糖尿病口服降糖新药 II 期试验 · 知情同意（王阿姨）",
+      "data_status": "reviewed",
+      "version": "1.0.0",
+      "disease_code": "T2DM",
+      "is_default": false,
+      "primary_scene": "informed_consent",
+      "mvp_scenes": ["S1"],
+      "file": "cases/CASE-T2DM-PH2-002.json",
+      "one_liner": "72岁女性，脚麻视物模糊，女儿陪同咨询 II 期试验知情同意。",
+      "default_persona_id": "PER-ELDER-FEMALE-02"
+    },
+    {
+      "case_id": "CASE-HTN-PH3-W4-001",
+      "short_title": "高血压 · III期 · 第4周随访",
+      "title": "原发性高血压 III 期试验 · 第4周门诊随访（SP 案例）",
+      "data_status": "reviewed",
+      "version": "1.0.0",
+      "disease_code": "HTN",
+      "is_default": false,
+      "primary_scene": "follow_up",
+      "mvp_scenes": ["S4", "S5"],
+      "file": "cases/CASE-HTN-PH3-W4-001.json",
+      "one_liner": "56岁出租车司机，第4周随访：了解服药、漏服、头晕、合并用药与血压记录。",
+      "default_persona_id": "PER-HTN-TAXI-01"
     }
   ]
 }

@@ -23,6 +23,10 @@ python -m uvicorn server.app.main:app --host 127.0.0.1 --port 8000
 
 ## 文档
 
+- [AISP 项目介绍](./AISP项目介绍.md)
+- [AISP PRD（产品需求）](./AISP-PRD.md)
+- [AISP 项目计划书](./AISP-项目计划书.md)
+- [AISP 技术架构（人话版）](./AISP-技术架构.md)
 - [项目架构设计文档](./项目架构设计文档.md)
 - [标准设计文档](./标准设计文档.md)
 - [病例设计文档](./病例设计文档.md)

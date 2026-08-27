@@ -1,9 +1,22 @@
 {
   "meta": {
-    "version": "1.0.0-mvp",
+    "version": "1.1.0-mvp",
     "scene": "informed_consent",
     "sceneLabel": "S1 知情同意沟通",
-    "passRule": "L1 全部通过且无 IC-X 违规项"
+    "passRule": "L1 全部通过且无 IC-X 违规项；练习参考分≥60",
+    "rubricFile": "scoring-rubric.json",
+    "scoringModel": {
+      "version": "1.1",
+      "totalScale": 100,
+      "passScore": 60,
+      "dimensions": [
+        { "id": "redline", "name": "红线（一票否决）", "weight": 0, "isGate": true },
+        { "id": "L1", "name": "必达内容", "weight": 0.50 },
+        { "id": "L2", "name": "过程合规", "weight": 0.20 },
+        { "id": "concern", "name": "关切回应", "weight": 0.30 }
+      ],
+      "verdictPoints": { "pass": 1.0, "uncertain": 0.5, "fail": 0.0 }
+    }
   },
   "layers": [
     { "id": "L1", "name": "硬性必达 / 禁止", "color": "#dc2626" },
@@ -34,6 +47,9 @@
     { "id": "IC-C08", "type": "content", "layer": "L2", "title": "补偿与花费", "pass": "说明补偿与自费", "fail": null, "sources": ["gcp-2020:第二十四条（十一）（十二）"], "enabledMvp": true, "hardFail": false },
     { "id": "IC-C10", "type": "content", "layer": "L2", "title": "记录查阅说明", "pass": "简要说明监查/稽查/监管查阅", "fail": null, "sources": ["gcp-2020:第二十四条（十四）"], "enabledMvp": true, "hardFail": false },
     { "id": "IC-C13", "type": "content", "layer": "L2", "title": "联系方式", "pass": "提供疑问联系人或伦理联系方式", "fail": null, "sources": ["gcp-2020:第二十四条（十七）"], "enabledMvp": true, "hardFail": false },
-    { "id": "IC-P10", "type": "process", "layer": "L2", "title": "提供 ICF 副本", "pass": "说明可获得签署文件副本", "fail": null, "sources": ["gcp-2020:第二十三条（九）"], "enabledMvp": true, "hardFail": false }
+    { "id": "IC-P10", "type": "process", "layer": "L2", "title": "提供 ICF 副本", "pass": "说明可获得签署文件副本", "fail": null, "sources": ["gcp-2020:第二十三条（九）"], "enabledMvp": true, "hardFail": false, "dimension": "L2" },
+    { "id": "CC-01", "type": "concern", "layer": "L1", "dimension": "concern", "title": "回应退出权关切", "pass": "明确可随时退出、不影响正常治疗", "fail": "未回应或回避退出权", "sources": ["IC-C09"], "enabledMvp": true, "hardFail": false, "weight": 1.2 },
+    { "id": "CC-02", "type": "concern", "layer": "L1", "dimension": "concern", "title": "回应疗效/安慰剂关切", "pass": "说明可能无效、可能分到对照/安慰剂", "fail": "未回应是否一定有效", "sources": ["IC-C05"], "enabledMvp": true, "hardFail": false, "weight": 1.2 },
+    { "id": "CC-03", "type": "concern", "layer": "L1", "dimension": "concern", "title": "回应副作用/风险关切", "pass": "具体说明可能不适/风险，非「很安全」", "fail": "未回应副作用或淡化风险", "sources": ["IC-C04"], "enabledMvp": true, "hardFail": false, "weight": 1.1 }
   ]
 }

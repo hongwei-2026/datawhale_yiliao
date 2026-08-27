@@ -249,6 +249,7 @@ CREATE TABLE IF NOT EXISTS feedback_report (
   overall_pass INTEGER,
   summary TEXT,
   improvements_json TEXT,
+  scores_json TEXT,
   disclaimer TEXT NOT NULL,
   created_at TEXT NOT NULL
 );
@@ -282,7 +283,18 @@ def connect(db_path: str | Path) -> sqlite3.Connection:
 
 def init_schema(conn: sqlite3.Connection) -> None:
     conn.executescript(SCHEMA_SQL)
+    migrate_schema(conn)
     conn.commit()
+
+
+def migrate_schema(conn: sqlite3.Connection) -> None:
+    """轻量迁移：为已有库补列。"""
+    cols = {
+        row["name"]
+        for row in conn.execute("PRAGMA table_info(feedback_report)").fetchall()
+    }
+    if cols and "scores_json" not in cols:
+        conn.execute("ALTER TABLE feedback_report ADD COLUMN scores_json TEXT")
 
 
 def table_counts(conn: sqlite3.Connection) -> dict[str, int]:

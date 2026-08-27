@@ -1,0 +1,41 @@
+{
+  "meta": {
+    "version": "1.1.0-followup",
+    "scene": "follow_up",
+    "sceneLabel": "S5 随访 · 依从性与 AE",
+    "passRule": "L1 全部通过且无 FU-X 红线 fail；练习参考分≥60",
+    "rubricFile": "scoring-rubric-followup.json",
+    "scoringModel": {
+      "version": "1.1",
+      "totalScale": 100,
+      "passScore": 60,
+      "dimensions": [
+        { "id": "redline", "name": "红线（一票否决）", "weight": 0, "isGate": true },
+        { "id": "L1", "name": "必达核查", "weight": 0.55 },
+        { "id": "L2", "name": "过程与安排", "weight": 0.25 },
+        { "id": "communication", "name": "沟通方式", "weight": 0.20 }
+      ],
+      "verdictPoints": { "pass": 1.0, "uncertain": 0.5, "fail": 0.0 }
+    }
+  },
+  "layers": [
+    { "id": "L1", "name": "必达核查", "color": "#dc2626" },
+    { "id": "L2", "name": "过程与安排", "color": "#2563eb" },
+    { "id": "communication", "name": "沟通方式", "color": "#7c3aed" }
+  ],
+  "items": [
+    { "id": "FU-A01", "type": "content", "layer": "L1", "dimension": "L1", "title": "了解漏服/迟服具体情况", "pass": "追问具体日期、原因、是否补服，共3次完全漏服", "fail": "仅问「都吃了吧」未追问细节", "enabledMvp": true, "hardFail": false, "weight": 1.2 },
+    { "id": "FU-A02", "type": "content", "layer": "L1", "dimension": "L1", "title": "了解头晕等不适", "pass": "追问第18天头晕、血压、是否联系中心、第19天停药", "fail": "未询问身体不适", "enabledMvp": true, "hardFail": false, "weight": 1.2 },
+    { "id": "FU-A03", "type": "content", "layer": "L1", "dimension": "L1", "title": "了解合并用药", "pass": "明确询问感冒药、原降压药、OTC/保健品", "fail": "未问其他用药", "enabledMvp": true, "hardFail": false, "weight": 1.1 },
+    { "id": "FU-A04", "type": "content", "layer": "L1", "dimension": "L1", "title": "核对药盒数量", "pass": "发现应剩7片实剩10片并与3次漏服对应", "fail": "未核对药盒", "enabledMvp": true, "hardFail": false, "weight": 1.0 },
+    { "id": "FU-A05", "type": "content", "layer": "L1", "dimension": "L1", "title": "核对服药日记真实性", "pass": "发现补记并说明应如实记录", "fail": "未查看日记或未纠正补记", "enabledMvp": true, "hardFail": false, "weight": 1.0 },
+    { "id": "FU-A06", "type": "content", "layer": "L1", "dimension": "L1", "title": "了解家庭血压记录", "pass": "询问测量方法、记录天数与不规范之处", "fail": "未了解家庭血压", "enabledMvp": true, "hardFail": false, "weight": 0.9 },
+    { "id": "FU-P01", "type": "process", "layer": "L2", "dimension": "L2", "title": "说明 AE/不适需及时联系", "pass": "说明不必等到特别严重才联系研究中心", "fail": null, "enabledMvp": true, "hardFail": false, "weight": 1.0 },
+    { "id": "FU-P02", "type": "process", "layer": "L2", "dimension": "L2", "title": "指导漏服/加药处理原则", "pass": "说明先联系、不要自行补服或加原降压药", "fail": null, "enabledMvp": true, "hardFail": false, "weight": 1.0 },
+    { "id": "FU-P03", "type": "process", "layer": "L2", "dimension": "L2", "title": "安排下次随访与联系方式", "pass": "明确下次随访时间和联系电话", "fail": null, "enabledMvp": true, "hardFail": false, "weight": 1.0 },
+    { "id": "FU-C01", "type": "process", "layer": "communication", "dimension": "communication", "title": "平和鼓励如实说明", "pass": "表达非责备、需要真实情况", "fail": "语气责备或威胁不能继续参加", "enabledMvp": true, "hardFail": false, "weight": 1.2 },
+    { "id": "FU-C02", "type": "process", "layer": "communication", "dimension": "communication", "title": "具体化提问", "pass": "按日期/场景逐步追问而非笼统提问", "fail": null, "enabledMvp": true, "hardFail": false, "weight": 1.0 },
+    { "id": "FU-X01", "type": "prohibition", "layer": "L1", "dimension": "redline", "title": "禁止责备恐吓", "pass": "无「为什么不按要求」「不能继续参加」等施压", "fail": "责备、威胁退出或补助", "enabledMvp": true, "hardFail": true, "weight": 1.0 },
+    { "id": "FU-X02", "type": "prohibition", "layer": "L1", "dimension": "redline", "title": "禁止自行决定医学处理", "pass": "未替医生决定停药/补药剂量", "fail": "研究者自行给出医学处置指令", "enabledMvp": true, "hardFail": true, "weight": 1.0 }
+  ]
+}
