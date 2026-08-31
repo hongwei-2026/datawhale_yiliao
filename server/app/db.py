@@ -261,6 +261,16 @@ CREATE TABLE IF NOT EXISTS verify_probe (
   detail_json TEXT NOT NULL,
   created_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS app_user (
+  id TEXT PRIMARY KEY,
+  username TEXT NOT NULL UNIQUE,
+  password_hash TEXT NOT NULL,
+  display_name TEXT NOT NULL,
+  role TEXT NOT NULL DEFAULT 'trainee',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
 """
 
 
@@ -295,6 +305,13 @@ def migrate_schema(conn: sqlite3.Connection) -> None:
     }
     if cols and "scores_json" not in cols:
         conn.execute("ALTER TABLE feedback_report ADD COLUMN scores_json TEXT")
+
+    ts_cols = {
+        row["name"]
+        for row in conn.execute("PRAGMA table_info(training_session)").fetchall()
+    }
+    if ts_cols and "trainee_user_id" not in ts_cols:
+        conn.execute("ALTER TABLE training_session ADD COLUMN trainee_user_id TEXT")
 
 
 def table_counts(conn: sqlite3.Connection) -> dict[str, int]:

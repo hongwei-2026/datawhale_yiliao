@@ -24,7 +24,7 @@ class MiniMaxTTS:
             return "(未配置)"
         return f"{key[:7]}…{key[-4:]}"
 
-    def synthesize(self, text: str) -> dict[str, Any]:
+    def synthesize(self, text: str, *, emotion: str | None = None) -> dict[str, Any]:
         text = (text or "").strip()
         if not text:
             return {"ok": False, "error": "文本为空"}
@@ -45,7 +45,7 @@ class MiniMaxTTS:
                 "speed": self.settings.minimax_voice_speed,
                 "vol": 1,
                 "pitch": 0,
-                "emotion": self.settings.minimax_voice_emotion,
+                "emotion": emotion or self.settings.minimax_voice_emotion,
             },
             "audio_setting": {
                 "sample_rate": 32000,

@@ -18,8 +18,10 @@ DISCLAIMER = (
 PROHIBITION_RULES = {
     "IC-X01": [r"不签(就)?(不|没)", r"必须参加", r"强迫", r"利诱", r"给你好处.*必须"],
     "IC-X02": [r"一定(能)?(治好|好|有效)", r"肯定(有效|没事|安全)", r"绝对(安全|有效)", r"包治", r"没有副作用", r"一点事都没有"],
+    "IC-X03": [r"不用提.*(风险|副作用|不良)", r"严重.*(不用|不必|别).*(说|提|讲)", r"那些.*(不用|不必).*(说|提)", r"隐瞒", r"淡化.*风险"],
     "IC-X04": [r"不签.*(不给|不好好|不理)", r"不参加.*(影响|不给).*治"],
     "IC-X05": [r"出了事.*自负", r"医院不负责", r"放弃.*权利", r"免责"],
+    "IC-X06": [r"不是.*(伦理|批准).*(版本|材料|同意书)", r"随便.*版本", r"旧版.*(用|签)", r"未经.*批准"],
     "FU-X01": [r"为什么不按要求", r"怎么能不", r"不能继续参加", r"责备", r"补助.*没了"],
     "FU-X02": [r"你就(停|停掉|补服|加服)", r"自己决定.*停药", r"不用再联系"],
 }
@@ -65,6 +67,96 @@ def _trainee_text(messages: list[dict]) -> str:
     return "\n".join(m["content"] for m in messages if m["role"] == "trainee")
 
 
+MIN_TRAINEE_TURNS = 3
+MIN_TRAINEE_CHARS = 120
+
+
+def dialogue_sample_stats(messages: list[dict]) -> dict[str, Any]:
+    """对话样本是否足以支撑练习参考分。"""
+    trainee_msgs = [m for m in messages if m["role"] == "trainee"]
+    text = _trainee_text(messages).strip()
+    turns = len(trainee_msgs)
+    chars = len(text)
+    sufficient = turns >= MIN_TRAINEE_TURNS and chars >= MIN_TRAINEE_CHARS
+    return {
+        "trainee_turns": turns,
+        "trainee_chars": chars,
+        "min_turns": MIN_TRAINEE_TURNS,
+        "min_chars": MIN_TRAINEE_CHARS,
+        "sufficient": sufficient,
+    }
+
+
+def checkpoint_progress(messages: list[dict], scene_key: str = "informed_consent") -> dict[str, Any]:
+    """启发式检查点覆盖（供会话摘要/学员端进度，非正式评分）。"""
+    rubric = load_rubric(scene_key)
+    enabled = [i for i in rubric.get("items", []) if i.get("enabledMvp")]
+    content_items = [i for i in enabled if not i.get("hardFail") and i.get("type") != "prohibition"]
+    rule = rule_pass(messages, enabled)
+    done = sum(1 for i in content_items if rule.get(i["id"], {}).get("verdict") == "pass")
+    total = len(content_items)
+    patient_msgs = [m for m in messages if m["role"] == "patient"]
+    trainee_msgs = [m for m in messages if m["role"] == "trainee"]
+    last_patient = (patient_msgs[-1].get("content") or "")[:160] if patient_msgs else ""
+    last_trainee = (trainee_msgs[-1].get("content") or "")[:160] if trainee_msgs else ""
+    pct = round(100 * done / total) if total else 0
+    summary_parts = [f"你说了 {len(trainee_msgs)} 轮"]
+    if total:
+        summary_parts.append(f"检查点约 {done}/{total}（{pct}%）")
+    if last_trainee:
+        summary_parts.append(f"你最近：「{last_trainee[:72]}{'…' if len(last_trainee) > 72 else ''}」")
+    if last_patient:
+        summary_parts.append(f"受试者最近：「{last_patient[:80]}{'…' if len(last_patient) > 80 else ''}」")
+    return {
+        "progress_done": done,
+        "progress_total": total,
+        "progress_pct": pct,
+        "last_patient_quote": last_patient,
+        "last_trainee_quote": last_trainee,
+        "dialogue_summary": " · ".join(summary_parts),
+    }
+
+
+def build_insufficient_sample_feedback(stats: dict[str, Any], scene_key: str) -> dict[str, Any]:
+    """对话样本不足时的反馈（不出数值参考分）。"""
+    scene_label = "随访沟通" if scene_key in ("follow_up", "adherence") else "知情同意沟通"
+    summary = (
+        f"本次{scene_label}对话过短（你说 {stats['trainee_turns']} 轮、约 {stats['trainee_chars']} 字），"
+        f"未达到出参考分的最低样本（建议至少 {stats['min_turns']} 轮、{stats['min_chars']} 字）。"
+        "请继续多轮沟通后再结束，系统才能对照检查点给出有意义的建议。"
+    )
+    return {
+        "overall_pass": False,
+        "checklist_pass": False,
+        "summary": summary,
+        "aggregate": {
+            "overall_pass": False,
+            "insufficient_sample": True,
+            "l1_total": 0,
+            "l1_pass": 0,
+            "pass_rule": "样本不足，未生成清单线结论",
+        },
+        "scores": {
+            "insufficient_sample": True,
+            "total_score": None,
+            "grade_label": "样本不足",
+            "practice_pass": False,
+            "note": "对话轮次或字数太少，不出练习参考分",
+            "dimensions": {},
+        },
+        "improvements": [
+            {
+                "item_code": "SAMPLE",
+                "title": "多练几轮再结束",
+                "suggestion": "按开练导览的检查点逐项沟通：漏服要问具体日期、风险要讲具体不适、关切要正面回应。",
+                "evidence": None,
+            }
+        ],
+        "disclaimer": DISCLAIMER,
+        "items": [],
+    }
+
+
 def _find_quote(messages: list[dict], patterns: list[str]) -> dict | None:
     for m in messages:
         if m["role"] != "trainee":
@@ -82,8 +174,17 @@ def rule_pass(messages: list[dict], items: list[dict]) -> dict[str, dict]:
     for item in items:
         code = item["id"]
         # 禁止项
-        if code in PROHIBITION_RULES or item.get("hardFail") or item["type"] == "prohibition":
-            quote = _find_quote(messages, PROHIBITION_RULES[code])
+        if item.get("hardFail") or item["type"] == "prohibition":
+            patterns = PROHIBITION_RULES.get(code)
+            if not patterns:
+                out[code] = {
+                    "verdict": "uncertain",
+                    "evidence_spans": [],
+                    "comment": "无专用规则模板，交由语义复核",
+                    "scorer_type": "rule",
+                }
+                continue
+            quote = _find_quote(messages, patterns)
             if quote:
                 out[code] = {
                     "verdict": "fail",

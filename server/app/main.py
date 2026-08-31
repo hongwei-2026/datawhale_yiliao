@@ -4,7 +4,7 @@ import json
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -12,9 +12,21 @@ from pydantic import BaseModel, Field
 
 from . import sessions as session_svc
 from .agnes import AgnesClient
+from .auth import (
+    authenticate_user,
+    create_access_token,
+    get_current_user_optional,
+    migrate_legacy_sessions,
+    register_user,
+    require_admin,
+    require_user,
+)
+from . import admin_svc
 from .config import get_settings
 from .db import connect, get_meta, init_schema, migrate_schema, new_id, set_meta, table_counts, utc_now
 from .minimax_tts import MiniMaxTTS
+from .musetalk import MuseTalkService
+from .talking_head import TalkingHeadService
 from .seed import seed
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -97,6 +109,8 @@ async def lifespan(app: FastAPI):
     init_schema(conn)
     conn.close()
     session_svc.backfill_missing_scores(app.state.db_path)
+    app.state.legacy_migration = migrate_legacy_sessions(app.state.db_path)
+    app.state.admin_bootstrap = admin_svc.ensure_admin_user(app.state.db_path)
     yield
 
 
@@ -120,6 +134,13 @@ app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 app.mount("/css", StaticFiles(directory=str(WEB_DIR / "css")), name="web-css")
 app.mount("/js", StaticFiles(directory=str(WEB_DIR / "js")), name="web-js")
 app.mount("/data", StaticFiles(directory=str(WEB_DIR / "data")), name="web-data")
+app.mount("/avatars", StaticFiles(directory=str(WEB_DIR / "avatars")), name="web-avatars")
+live2d_dir = WEB_DIR / "live2d"
+if live2d_dir.is_dir():
+    app.mount("/live2d", StaticFiles(directory=str(live2d_dir)), name="web-live2d")
+talking_cache_dir = ROOT / "data" / "talking_cache"
+talking_cache_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/media/talking", StaticFiles(directory=str(talking_cache_dir)), name="talking-media")
 
 
 def db():
@@ -192,10 +213,20 @@ class TtsBody(BaseModel):
     text: str = Field(min_length=1, max_length=800)
 
 
+class PatientSpeakBody(BaseModel):
+    text: str = Field(min_length=1, max_length=800)
+    persona_id: str = Field(default="", max_length=64)
+    prefer_talking_video: bool = True
+    emotion: str = Field(default="", max_length=32)
+
+
 @app.get("/api/voice/status")
 def api_voice_status():
     settings = app.state.settings
     tts = MiniMaxTTS(settings)
+    talking = TalkingHeadService(settings)
+    musetalk = MuseTalkService(settings)
+    mt_health = musetalk.health() if musetalk.enabled else {"ok": False}
     return {
         "ok": True,
         "configured": tts.configured,
@@ -203,8 +234,145 @@ def api_voice_status():
         "model": settings.minimax_tts_model,
         "voice_id": settings.minimax_voice_id,
         "stt": "browser_web_speech",
+        "musetalk": {
+            "enabled": musetalk.enabled,
+            "ready": bool(mt_health.get("ok")),
+            "avatars": mt_health.get("avatars") or [],
+            "error": mt_health.get("error"),
+            "base_url": musetalk.base_url if musetalk.enabled else None,
+            "timeout_sec": settings.musetalk_timeout_sec,
+            "note": "GPU 本地 MuseTalk，音画合一口型（推荐）",
+        },
+        "talking_head": {
+            "enabled": talking.enabled,
+            "provider": "minimax_h3",
+            "resolution": settings.talking_head_resolution,
+            "timeout_sec": settings.talking_head_timeout_sec,
+            "note": "默认关闭；开启后需等待 30–90 秒生成视频，且与实时语音不同步",
+        },
         "note": "受试者旁白用 MiniMax TTS；你的说话用浏览器语音识别，便于低延迟与打断。",
     }
+
+
+@app.get("/api/voice/talking-head/status")
+def api_talking_head_status():
+    settings = app.state.settings
+    talking = TalkingHeadService(settings)
+    return {
+        "ok": True,
+        "enabled": talking.enabled,
+        "provider": "minimax_h3",
+        "resolution": settings.talking_head_resolution,
+        "timeout_sec": settings.talking_head_timeout_sec,
+    }
+
+
+@app.post("/api/voice/patient-speak")
+def api_voice_patient_speak(body: PatientSpeakBody):
+    """受试者说话：TTS + 可选 MuseTalk/H3 口型视频。"""
+    settings = app.state.settings
+    tts = MiniMaxTTS(settings)
+    talking = TalkingHeadService(settings)
+    musetalk = MuseTalkService(settings)
+
+    tts_result = tts.synthesize(body.text, emotion=body.emotion or None)
+    if not tts_result.get("ok") and body.emotion:
+        tts_result = tts.synthesize(body.text, emotion=None)
+    if not tts_result.get("ok"):
+        err = tts_result.get("error") or "语音合成失败"
+        # 余额不足等：软失败，前端可继续纯文字对话
+        if any(k in str(err).lower() for k in ("insufficient", "balance", "余额", "quota")):
+            return {
+                "ok": False,
+                "soft": True,
+                "error": f"{err}（语音暂时不可用，可继续文字对话）",
+                "mode": "text_only",
+            }
+        raise HTTPException(400, err)
+
+    import base64 as b64mod
+
+    audio_bytes = b64mod.b64decode(tts_result["audio_base64"])
+    audio_length_ms = tts_result.get("audio_length_ms")
+
+    out = {
+        "ok": True,
+        "format": tts_result.get("format") or "mp3",
+        "audio_base64": tts_result["audio_base64"],
+        "audio_length_ms": audio_length_ms,
+        "mode": "audio_only",
+        "model": tts_result.get("model"),
+        "voice_id": tts_result.get("voice_id"),
+    }
+
+    if not body.prefer_talking_video:
+        return out
+
+    # MuseTalk（GPU 本地，音画合一）优先
+    if musetalk.enabled:
+        cached = musetalk.cached_video_url(body.persona_id, body.text, audio_bytes)
+        if cached:
+            out.update({
+                "mode": "talking_video",
+                "video_url": cached,
+                "cache_hit": True,
+                "lip_sync": "musetalk",
+            })
+            return out
+        job_id = musetalk.start_job(
+            persona_id=body.persona_id,
+            text=body.text,
+            audio_bytes=audio_bytes,
+        )
+        out.update({
+            "mode": "musetalk_video_job",
+            "video_job_id": job_id,
+            "lip_sync": "musetalk",
+            "note": "等待 GPU 口型视频（音画合一，约 3–15 秒）",
+        })
+        return out
+
+    # 回退：MiniMax H3（慢，默认关闭）
+    video_audio_bytes = audio_bytes
+    video_audio_ms = audio_length_ms
+    if talking.enabled and (not audio_length_ms or audio_length_ms < 2000):
+        padded = tts.synthesize(f"{body.text.rstrip()}……")
+        if padded.get("ok"):
+            video_audio_bytes = b64mod.b64decode(padded["audio_base64"])
+            video_audio_ms = padded.get("audio_length_ms")
+
+    if not talking.enabled:
+        return out
+
+    cached = talking.cached_video_url(body.persona_id, body.text, video_audio_bytes)
+    if cached:
+        out.update({"mode": "talking_video", "video_url": cached, "cache_hit": True})
+        return out
+
+    job_id = talking.start_job(
+        persona_id=body.persona_id,
+        text=body.text,
+        audio_bytes=video_audio_bytes,
+        audio_length_ms=video_audio_ms,
+    )
+    out.update({
+        "mode": "audio_with_video_job",
+        "video_job_id": job_id,
+        "lip_sync": "h3",
+        "note": "语音立即播放；口型视频后台生成，完成后自动切换",
+    })
+    return out
+
+
+@app.get("/api/voice/patient-speak/video/{job_id}")
+def api_voice_patient_speak_video(job_id: str):
+    settings = app.state.settings
+    job = MuseTalkService(settings).get_job(job_id)
+    if not job:
+        job = TalkingHeadService(settings).get_job(job_id)
+    if not job:
+        raise HTTPException(404, "任务不存在或已过期")
+    return {"ok": True, **job}
 
 
 @app.post("/api/voice/tts")
@@ -514,10 +682,74 @@ def reseed():
     return result
 
 
+# ----- 用户认证 -----
+
+class RegisterBody(BaseModel):
+    username: str = Field(min_length=2, max_length=32)
+    password: str = Field(min_length=6, max_length=128)
+    display_name: str | None = Field(default=None, max_length=64)
+
+
+class LoginBody(BaseModel):
+    username: str = Field(min_length=2, max_length=32)
+    password: str = Field(min_length=1, max_length=128)
+
+
+@app.post("/api/auth/register")
+def api_register(body: RegisterBody):
+    result = register_user(
+        app.state.db_path,
+        username=body.username,
+        password=body.password,
+        display_name=body.display_name,
+    )
+    if not result.get("ok"):
+        raise HTTPException(400, result.get("error") or "注册失败")
+    settings = app.state.settings
+    token = create_access_token(
+        result["user"]["id"], settings.jwt_secret, settings.jwt_ttl_seconds
+    )
+    return {"ok": True, "token": token, "user": result["user"]}
+
+
+@app.post("/api/auth/login")
+def api_login(body: LoginBody):
+    result = authenticate_user(app.state.db_path, body.username, body.password)
+    if not result.get("ok"):
+        raise HTTPException(401, result.get("error") or "登录失败")
+    settings = app.state.settings
+    token = create_access_token(
+        result["user"]["id"], settings.jwt_secret, settings.jwt_ttl_seconds
+    )
+    return {"ok": True, "token": token, "user": result["user"]}
+
+
+@app.get("/api/auth/me")
+def api_me(user: dict | None = Depends(get_current_user_optional)):
+    if not user:
+        return {"ok": True, "authenticated": False, "user": None}
+    return {"ok": True, "authenticated": True, "user": user}
+
+
+@app.get("/api/auth/legacy-info")
+def api_legacy_info():
+    """历史数据归属账号说明（不含密码）。"""
+    mig = getattr(app.state, "legacy_migration", None) or {}
+    return {
+        "ok": True,
+        "username": mig.get("username", "history"),
+        "display_name": mig.get("display_name", "历史练习数据"),
+        "migrated_sessions": mig.get("migrated", 0),
+        "note": "上线登录功能前的练习记录已归属此账号，请联系管理员获取初始密码。",
+    }
+
+
 # ----- 练习会话：AI 对话 + 反馈 -----
 
 class CreateSessionBody(BaseModel):
     case_id: str | None = None
+    session_mode: str = Field(default="practice", pattern="^(practice|assessment)$")
+    study_mode: str = Field(default="reference", pattern="^(reference|strict)$")
 
 
 class TurnBody(BaseModel):
@@ -525,22 +757,39 @@ class TurnBody(BaseModel):
 
 
 @app.get("/api/sessions/history")
-def api_session_history(limit: int = 20):
-    sessions = session_svc.list_sessions(app.state.db_path, limit=limit)
+def api_session_history(limit: int = 20, user: dict = Depends(require_user)):
+    sessions = session_svc.list_sessions(
+        app.state.db_path,
+        limit=limit,
+        trainee_user_id=user["id"],
+        actor_role=user.get("role"),
+    )
     return {"ok": True, "sessions": sessions}
 
 
 @app.post("/api/sessions")
-def api_create_session(body: CreateSessionBody | None = None):
+def api_create_session(
+    body: CreateSessionBody | None = None,
+    user: dict = Depends(require_user),
+):
     body = body or CreateSessionBody()
-    return session_svc.create_session(app.state.db_path, body.case_id)
+    return session_svc.create_session(
+        app.state.db_path,
+        body.case_id,
+        trainee_user_id=user["id"],
+        session_mode=body.session_mode,
+        study_mode=body.study_mode,
+        settings=app.state.settings,
+    )
 
 
 @app.get("/api/sessions/{session_id}")
-def api_get_session(session_id: str):
+def api_get_session(session_id: str, user: dict = Depends(require_user)):
     sess = session_svc.get_session(app.state.db_path, session_id)
-    if not sess:
-        raise HTTPException(404, "会话不存在")
+    err = session_svc.session_access_error(sess, user["id"], actor_role=user.get("role"))
+    if err:
+        raise HTTPException(404 if err == "会话不存在" else 403, err)
+    meta = session_svc.parse_session_meta(sess)
     return {
         "ok": True,
         "session": {
@@ -551,31 +800,209 @@ def api_get_session(session_id: str):
             "status": sess["status"],
             "started_at": sess["started_at"],
             "ended_at": sess["ended_at"],
+            "session_mode": meta["session_mode"],
+            "study_mode": meta["study_mode"],
         },
         "messages": session_svc.get_messages(app.state.db_path, session_id),
         "feedback": session_svc.get_feedback(app.state.db_path, session_id),
+        "patient_affect": session_svc.session_patient_affect(sess),
     }
 
 
 @app.post("/api/sessions/{session_id}/turns")
-def api_post_turn(session_id: str, body: TurnBody):
-    result = session_svc.post_turn(app.state.db_path, app.state.settings, session_id, body.content)
+def api_post_turn(session_id: str, body: TurnBody, user: dict = Depends(require_user)):
+    result = session_svc.post_turn(
+        app.state.db_path,
+        app.state.settings,
+        session_id,
+        body.content,
+        user["id"],
+        actor_role=user.get("role"),
+    )
     if not result.get("ok"):
-        raise HTTPException(400, result.get("error") or "发送失败")
+        status = int(result.get("http_status") or 400)
+        raise HTTPException(status, result.get("error") or "发送失败")
     return result
 
 
 @app.post("/api/sessions/{session_id}/complete")
-def api_complete(session_id: str):
-    result = session_svc.complete_session(app.state.db_path, app.state.settings, session_id)
+def api_complete(session_id: str, user: dict = Depends(require_user)):
+    result = session_svc.complete_session(
+        app.state.db_path,
+        app.state.settings,
+        session_id,
+        user["id"],
+        actor_role=user.get("role"),
+    )
     if not result.get("ok"):
-        raise HTTPException(400, result.get("error") or "结束失败")
+        status = int(result.get("http_status") or 400)
+        raise HTTPException(status, result.get("error") or "结束失败")
     return result
 
 
 @app.get("/api/sessions/{session_id}/feedback")
-def api_feedback(session_id: str):
+def api_feedback(session_id: str, user: dict = Depends(require_user)):
+    sess = session_svc.get_session(app.state.db_path, session_id)
+    err = session_svc.session_access_error(sess, user["id"], actor_role=user.get("role"))
+    if err:
+        raise HTTPException(404 if err == "会话不存在" else 403, err)
     fb = session_svc.get_feedback(app.state.db_path, session_id)
     if not fb:
         raise HTTPException(404, "尚无反馈，请先结束沟通")
     return {"ok": True, "feedback": fb}
+
+
+# ----- 管理端 -----
+
+class AdminUserCreateBody(BaseModel):
+    username: str
+    password: str
+    display_name: str | None = None
+    role: str = "trainee"
+
+
+class AdminUserUpdateBody(BaseModel):
+    role: str | None = None
+    display_name: str | None = None
+    password: str | None = None
+
+
+class AdminSceneBody(BaseModel):
+    id: str | None = None
+    scene_key: str | None = None
+    title: str | None = None
+    name: str | None = None
+    summary: str = ""
+    description: str | None = None
+    code: str | None = None
+    enabled: bool = True
+
+
+class AdminAvatarBody(BaseModel):
+    persona_id: str
+    visual: str | None = None
+    portrait_path: str | None = None
+    model_id: str | None = None
+
+
+@app.get("/api/admin/stats")
+def api_admin_stats(user: dict = Depends(require_admin)):
+    return admin_svc.admin_stats(app.state.db_path)
+
+
+@app.get("/api/admin/users")
+def api_admin_users(user: dict = Depends(require_admin)):
+    return {"ok": True, "users": admin_svc.list_users(app.state.db_path)}
+
+
+@app.post("/api/admin/users")
+def api_admin_create_user(body: AdminUserCreateBody, user: dict = Depends(require_admin)):
+    result = admin_svc.create_user(
+        app.state.db_path,
+        username=body.username,
+        password=body.password,
+        display_name=body.display_name,
+        role=body.role,
+    )
+    if not result.get("ok"):
+        raise HTTPException(400, result.get("error") or "创建失败")
+    return result
+
+
+@app.patch("/api/admin/users/{user_id}")
+def api_admin_update_user(user_id: str, body: AdminUserUpdateBody, user: dict = Depends(require_admin)):
+    result = admin_svc.update_user(
+        app.state.db_path,
+        user_id,
+        role=body.role,
+        display_name=body.display_name,
+        password=body.password,
+    )
+    if not result.get("ok"):
+        raise HTTPException(400, result.get("error") or "更新失败")
+    return result
+
+
+@app.delete("/api/admin/users/{user_id}")
+def api_admin_delete_user(user_id: str, user: dict = Depends(require_admin)):
+    result = admin_svc.delete_user(app.state.db_path, user_id, actor_id=user["id"])
+    if not result.get("ok"):
+        raise HTTPException(400, result.get("error") or "删除失败")
+    return result
+
+
+@app.get("/api/admin/cases")
+def api_admin_cases(user: dict = Depends(require_admin)):
+    return admin_svc.list_case_catalog()
+
+
+@app.post("/api/admin/cases/import")
+def api_admin_import_case(body: dict, user: dict = Depends(require_admin)):
+    result = admin_svc.import_case_package(body)
+    if not result.get("ok"):
+        raise HTTPException(400, result.get("error") or "导入失败")
+    return result
+
+
+@app.delete("/api/admin/cases/{case_id}")
+def api_admin_delete_case(case_id: str, user: dict = Depends(require_admin)):
+    result = admin_svc.delete_case(case_id)
+    if not result.get("ok"):
+        raise HTTPException(400, result.get("error") or "删除失败")
+    return result
+
+
+@app.get("/api/admin/scenes")
+def api_admin_scenes(user: dict = Depends(require_admin)):
+    return admin_svc.list_scenes()
+
+
+@app.post("/api/admin/scenes")
+def api_admin_upsert_scene(body: AdminSceneBody, user: dict = Depends(require_admin)):
+    result = admin_svc.upsert_scene(body.model_dump())
+    if not result.get("ok"):
+        raise HTTPException(400, result.get("error") or "保存失败")
+    return result
+
+
+@app.delete("/api/admin/scenes/{scene_id}")
+def api_admin_delete_scene(scene_id: str, user: dict = Depends(require_admin)):
+    result = admin_svc.delete_scene(scene_id)
+    if not result.get("ok"):
+        raise HTTPException(400, result.get("error") or "删除失败")
+    return result
+
+
+@app.get("/api/admin/avatars")
+def api_admin_avatars(user: dict = Depends(require_admin)):
+    return admin_svc.list_avatars()
+
+
+@app.post("/api/admin/avatars")
+def api_admin_avatars_update(body: AdminAvatarBody, user: dict = Depends(require_admin)):
+    result = admin_svc.update_avatar_binding(
+        persona_id=body.persona_id,
+        visual=body.visual,
+        portrait_path=body.portrait_path,
+        model_id=body.model_id,
+    )
+    if not result.get("ok"):
+        raise HTTPException(400, result.get("error") or "更新失败")
+    return result
+
+
+@app.post("/api/admin/avatars/upload")
+async def api_admin_avatars_upload(
+    file: UploadFile = File(...),
+    persona_id: str | None = Form(None),
+    user: dict = Depends(require_admin),
+):
+    content = await file.read()
+    result = admin_svc.save_portrait_upload(
+        filename=file.filename or "portrait.webp",
+        content=content,
+        persona_id=(persona_id or "").strip() or None,
+    )
+    if not result.get("ok"):
+        raise HTTPException(400, result.get("error") or "上传失败")
+    return result

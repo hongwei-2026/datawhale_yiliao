@@ -1,0 +1,81 @@
+{
+  "version": 5,
+  "default_visual": "live2d",
+  "persona_visual": {
+    "PER-HTN-TAXI-01": "live2d",
+    "PER-ELDER-BASIC-01": "live2d",
+    "PER-ELDER-FEMALE-02": "live2d",
+    "default": "live2d"
+  },
+  "portraits": {
+    "PER-HTN-TAXI-01": "/live2d/portraits/PER-HTN-TAXI-01.webp",
+    "PER-ELDER-BASIC-01": "/live2d/portraits/PER-ELDER-BASIC-01.webp",
+    "PER-ELDER-FEMALE-02": "/live2d/portraits/PER-ELDER-FEMALE-02.webp",
+    "default": "/live2d/portraits/PER-ELDER-BASIC-01.webp"
+  },
+  "models": {
+    "mark": {
+      "path": "/live2d/models/mark/Mark.model3.json",
+      "label": "Mark（Cubism 官方示例·男）",
+      "gender": "male",
+      "kScale": 0.16,
+      "reserveBottom": 0.34,
+      "anchorX": 0.5,
+      "anchorY": 1,
+      "initialXshift": 0,
+      "initialYshift": 24,
+      "idleMotionGroupName": "Idle",
+      "emotionMap": {
+        "neutral": null,
+        "thinking": null,
+        "speaking": null
+      }
+    },
+    "natori": {
+      "path": "/live2d/models/natori/Natori.model3.json",
+      "label": "Natori（Cubism 官方示例·男）",
+      "gender": "male",
+      "kScale": 0.14,
+      "reserveBottom": 0.36,
+      "anchorX": 0.5,
+      "anchorY": 1,
+      "initialXshift": 0,
+      "initialYshift": 18,
+      "idleMotionGroupName": "Idle",
+      "emotionMap": {
+        "neutral": "Normal",
+        "thinking": "Sad",
+        "speaking": "Smile"
+      }
+    },
+    "hiyori": {
+      "path": "/live2d/models/hiyori/Hiyori.model3.json",
+      "label": "Hiyori（Cubism 官方示例·女）",
+      "gender": "female",
+      "kScale": 0.15,
+      "reserveBottom": 0.34,
+      "anchorX": 0.5,
+      "anchorY": 1,
+      "initialXshift": 0,
+      "initialYshift": 28,
+      "idleMotionGroupName": "Idle",
+      "emotionMap": {
+        "neutral": null,
+        "thinking": null,
+        "speaking": null
+      }
+    }
+  },
+  "persona_map": {
+    "PER-HTN-TAXI-01": "mark",
+    "PER-ELDER-BASIC-01": "natori",
+    "PER-ELDER-FEMALE-02": "hiyori",
+    "default": "mark"
+  },
+  "backgrounds": {},
+  "asset_notes": {
+    "live2d_models": "Live2D CubismWebSamples 官方示例（开源可商用需遵守 Live2D 许可）",
+    "portraits": "MiniMax Image-01 写实半身像；H3 说话数字人以此为参考图",
+    "backgrounds": "CSS 默认诊室 + 可选 MiniMax 生成背景图"
+  }
+}

@@ -8,15 +8,31 @@ from typing import Any
 from .agnes import AgnesClient
 from .case_loader import case_primary_scene, load_case, load_rubric
 from .db import connect, new_id, utc_now
-from .patient_agent import generate_patient_reply
-from .scoring_engine import DISCLAIMER, recompute_scores_from_rows, run_scoring
+from .patient_agent import generate_patient_opening, generate_patient_reply
+from .patient_engine import default_emotion, public_affect
+from .scoring_engine import (
+    DISCLAIMER,
+    build_insufficient_sample_feedback,
+    checkpoint_progress,
+    dialogue_sample_stats,
+    recompute_scores_from_rows,
+    run_scoring,
+)
 
 
 def _conn(db_path: str):
     return connect(db_path)
 
 
-def create_session(db_path: str, case_id: str | None = None) -> dict[str, Any]:
+def create_session(
+    db_path: str,
+    case_id: str | None = None,
+    trainee_user_id: str | None = None,
+    *,
+    session_mode: str = "practice",
+    study_mode: str = "reference",
+    settings=None,
+) -> dict[str, Any]:
     case = load_case(case_id)
     meta = case["meta"]
     persona = case["persona"]
@@ -24,6 +40,11 @@ def create_session(db_path: str, case_id: str | None = None) -> dict[str, Any]:
     rubric = load_rubric(scene_key)
     script = case.get("session_script") or {}
     scene_label = script.get("scene_label") or rubric.get("meta", {}).get("sceneLabel") or scene_key
+    session_mode = session_mode if session_mode in ("practice", "assessment") else "practice"
+    study_mode = study_mode if study_mode in ("reference", "strict") else "reference"
+    if session_mode == "assessment":
+        study_mode = "strict"
+    initial_emotion = default_emotion(case)
     sid = new_id()
     now = utc_now()
     conn = _conn(db_path)
@@ -31,8 +52,8 @@ def create_session(db_path: str, case_id: str | None = None) -> dict[str, Any]:
         """
         INSERT INTO training_session(
           id, case_code, case_version, persona_code, scene_key, rubric_version,
-          status, started_at, meta_json
-        ) VALUES(?,?,?,?,?,?,?,?,?)
+          status, started_at, meta_json, trainee_user_id
+        ) VALUES(?,?,?,?,?,?,?,?,?,?)
         """,
         (
             sid,
@@ -43,7 +64,16 @@ def create_session(db_path: str, case_id: str | None = None) -> dict[str, Any]:
             rubric["meta"]["version"],
             "in_progress",
             now,
-            json.dumps({"scene_label": scene_label}, ensure_ascii=False),
+            json.dumps(
+                {
+                    "scene_label": scene_label,
+                    "session_mode": session_mode,
+                    "study_mode": study_mode,
+                    "emotion": initial_emotion,
+                },
+                ensure_ascii=False,
+            ),
+            trainee_user_id,
         ),
     )
     opening = script.get("system_opening") or (
@@ -58,11 +88,15 @@ def create_session(db_path: str, case_id: str | None = None) -> dict[str, Any]:
         """,
         (new_id(), sid, 0, "system", opening, now),
     )
-    greet = script.get("patient_greeting") or (
-        "大夫，护士让我过来问问这个药试验的事。"
-        "我年纪大了，你们说慢一点。"
-        "我想先弄清楚三件事：能不能中途不参加、有没有大副作用、是不是一定有效。"
+    client = AgnesClient(settings) if settings else None
+    greet_result = generate_patient_opening(
+        client,
+        case=case,
+        scene_key=scene_key,
+        session_nonce=sid[:8],
+        emotion_state=initial_emotion,
     )
+    greet = (greet_result.get("content") or "").strip() or "大夫，我来了。"
     conn.execute(
         """
         INSERT INTO session_message(id, session_id, turn_index, role, content, created_at)
@@ -89,7 +123,10 @@ def create_session(db_path: str, case_id: str | None = None) -> dict[str, Any]:
             "display_name": persona.get("display_name"),
             "lay_bio": persona.get("lay_bio"),
         },
+        "session_mode": session_mode,
+        "study_mode": study_mode,
         "messages": get_messages(db_path, sid),
+        "patient_affect": public_affect(initial_emotion),
     }
 
 
@@ -98,6 +135,52 @@ def get_session(db_path: str, session_id: str) -> dict | None:
     row = conn.execute("SELECT * FROM training_session WHERE id=?", (session_id,)).fetchone()
     conn.close()
     return dict(row) if row else None
+
+
+def session_patient_affect(sess: dict | None) -> dict[str, Any] | None:
+    if not sess or not sess.get("meta_json"):
+        return None
+    try:
+        obj = json.loads(sess["meta_json"])
+        em = obj.get("emotion")
+        if isinstance(em, dict):
+            return public_affect(em)
+    except json.JSONDecodeError:
+        pass
+    return None
+
+
+def parse_session_meta(sess: dict | None) -> dict[str, str]:
+    if not sess:
+        return {"session_mode": "practice", "study_mode": "reference"}
+    raw = sess.get("meta_json")
+    if not raw:
+        return {"session_mode": "practice", "study_mode": "reference"}
+    try:
+        obj = json.loads(raw)
+        return {
+            "session_mode": obj.get("session_mode") or "practice",
+            "study_mode": obj.get("study_mode") or "reference",
+        }
+    except json.JSONDecodeError:
+        return {"session_mode": "practice", "study_mode": "reference"}
+
+
+def session_access_error(
+    sess: dict | None,
+    trainee_user_id: str | None,
+    *,
+    actor_role: str | None = None,
+) -> str | None:
+    if not sess:
+        return "会话不存在"
+    # 管理员可查看/继续任意会话（管理端排查、演示）
+    if (actor_role or "").lower() == "admin":
+        return None
+    owner = sess.get("trainee_user_id")
+    if trainee_user_id and owner and owner != trainee_user_id:
+        return "无权访问此会话"
+    return None
 
 
 def get_messages(db_path: str, session_id: str) -> list[dict]:
@@ -113,16 +196,25 @@ def get_messages(db_path: str, session_id: str) -> list[dict]:
     return [dict(r) for r in rows]
 
 
-def post_turn(db_path: str, settings, session_id: str, content: str) -> dict[str, Any]:
+def post_turn(
+    db_path: str,
+    settings,
+    session_id: str,
+    content: str,
+    trainee_user_id: str | None = None,
+    *,
+    actor_role: str | None = None,
+) -> dict[str, Any]:
     content = (content or "").strip()
     if not content:
         return {"ok": False, "error": "内容不能为空"}
 
     sess = get_session(db_path, session_id)
-    if not sess:
-        return {"ok": False, "error": "会话不存在"}
+    err = session_access_error(sess, trainee_user_id, actor_role=actor_role)
+    if err:
+        return {"ok": False, "error": err, "http_status": 403 if err == "无权访问此会话" else 400}
     if sess["status"] != "in_progress":
-        return {"ok": False, "error": "会话已结束"}
+        return {"ok": False, "error": "会话已结束", "http_status": 400}
 
     case = load_case(sess["case_code"])
     history = get_messages(db_path, session_id)
@@ -150,12 +242,21 @@ def post_turn(db_path: str, settings, session_id: str, content: str) -> dict[str
     conn.commit()
 
     try:
+        meta_obj: dict[str, Any] = {}
+        if sess.get("meta_json"):
+            try:
+                meta_obj = json.loads(sess["meta_json"])
+            except json.JSONDecodeError:
+                meta_obj = {}
+        prior_emotion = meta_obj.get("emotion")
+
         gen = generate_patient_reply(
             client,
             case=case,
             history=hist_for_ai,
             trainee_text=content,
             scene_key=sess.get("scene_key"),
+            emotion_state=prior_emotion,
         )
     except Exception as exc:
         gen = {
@@ -210,6 +311,26 @@ def post_turn(db_path: str, settings, session_id: str, content: str) -> dict[str
         """,
         (new_id(), session_id, patient_turn, "patient", (gen.get("content") or "").strip() or "嗯……您刚才说的什么？我没太听明白，您能再说一遍吗？", gen_id, ended),
     )
+    all_messages = conn.execute(
+        "SELECT turn_index, role, content FROM session_message WHERE session_id=? ORDER BY turn_index",
+        (session_id,),
+    ).fetchall()
+    msg_list = [dict(m) for m in all_messages]
+    scene_key = sess.get("scene_key") or "informed_consent"
+    progress = checkpoint_progress(msg_list, scene_key)
+    meta_obj: dict[str, Any] = {}
+    if sess.get("meta_json"):
+        try:
+            meta_obj = json.loads(sess["meta_json"])
+        except json.JSONDecodeError:
+            meta_obj = {}
+    meta_obj.update(progress)
+    if gen.get("emotion_state"):
+        meta_obj["emotion"] = gen["emotion_state"]
+    conn.execute(
+        "UPDATE training_session SET meta_json=? WHERE id=?",
+        (json.dumps(meta_obj, ensure_ascii=False), session_id),
+    )
     conn.commit()
     conn.close()
 
@@ -220,13 +341,22 @@ def post_turn(db_path: str, settings, session_id: str, content: str) -> dict[str
         "grounding": gen.get("grounding"),
         "latency_ms": gen.get("latency_ms"),
         "messages": get_messages(db_path, session_id),
+        "patient_affect": gen.get("patient_affect"),
     }
 
 
-def complete_session(db_path: str, settings, session_id: str) -> dict[str, Any]:
+def complete_session(
+    db_path: str,
+    settings,
+    session_id: str,
+    trainee_user_id: str | None = None,
+    *,
+    actor_role: str | None = None,
+) -> dict[str, Any]:
     sess = get_session(db_path, session_id)
-    if not sess:
-        return {"ok": False, "error": "会话不存在"}
+    err = session_access_error(sess, trainee_user_id, actor_role=actor_role)
+    if err:
+        return {"ok": False, "error": err, "http_status": 403 if err == "无权访问此会话" else 400}
 
     messages = get_messages(db_path, session_id)
     trainee_msgs = [m for m in messages if m["role"] == "trainee"]
@@ -244,6 +374,47 @@ def complete_session(db_path: str, settings, session_id: str) -> dict[str, Any]:
     conn.commit()
 
     scene_key = sess.get("scene_key") or "informed_consent"
+    sample_stats = dialogue_sample_stats(messages)
+    if not sample_stats["sufficient"]:
+        report = build_insufficient_sample_feedback(sample_stats, scene_key)
+        ended = utc_now()
+        conn = _conn(db_path)
+        conn.execute("DELETE FROM score_result WHERE session_id=?", (session_id,))
+        conn.execute("DELETE FROM feedback_report WHERE session_id=?", (session_id,))
+        conn.execute(
+            """
+            INSERT INTO feedback_report(
+              id, session_id, overall_pass, summary, improvements_json, scores_json, disclaimer, created_at
+            ) VALUES(?,?,?,?,?,?,?,?)
+            """,
+            (
+                new_id(),
+                session_id,
+                0,
+                report["summary"],
+                json.dumps(report.get("improvements") or [], ensure_ascii=False),
+                json.dumps(report.get("scores") or {}, ensure_ascii=False),
+                report.get("disclaimer") or "",
+                ended,
+            ),
+        )
+        conn.execute(
+            "UPDATE training_session SET status=?, ended_at=? WHERE id=?",
+            ("completed", ended, session_id),
+        )
+        conn.execute(
+            "UPDATE ai_agent_run SET status=?, ended_at=? WHERE id=?",
+            ("succeeded", ended, run_id),
+        )
+        conn.commit()
+        conn.close()
+        return {
+            "ok": True,
+            "session_id": session_id,
+            "feedback": get_feedback(db_path, session_id),
+            "insufficient_sample": True,
+        }
+
     scored = run_scoring(client, messages, scene_key=scene_key)
     ended = utc_now()
     results = scored["results"]
@@ -434,37 +605,104 @@ def backfill_missing_scores(db_path: str) -> int:
     return updated
 
 
-def list_sessions(db_path: str, limit: int = 20) -> list[dict[str, Any]]:
-    """最近练习会话（含是否有反馈、摘要预览）。"""
+def list_sessions(
+    db_path: str,
+    limit: int = 20,
+    trainee_user_id: str | None = None,
+    *,
+    actor_role: str | None = None,
+) -> list[dict[str, Any]]:
+    """最近练习会话（含是否有反馈、摘要预览）。管理员可见全部账号的会话。"""
     conn = _conn(db_path)
+    params: list[Any] = []
+    user_filter = ""
+    if trainee_user_id and (actor_role or "").lower() != "admin":
+        user_filter = "WHERE ts.trainee_user_id = ?"
+        params.append(trainee_user_id)
+    params.append(max(1, min(limit, 100)))
     rows = conn.execute(
-        """
+        f"""
         SELECT
           ts.id,
           ts.case_code,
           ts.persona_code,
+          ts.scene_key,
           ts.status,
           ts.started_at,
           ts.ended_at,
+          ts.meta_json,
           fr.overall_pass,
           fr.summary,
           fr.scores_json,
           fr.created_at AS feedback_at,
           (
             SELECT COUNT(*) FROM session_message sm WHERE sm.session_id = ts.id
-          ) AS message_count
+          ) AS message_count,
+          (
+            SELECT COUNT(*) FROM session_message sm WHERE sm.session_id = ts.id AND sm.role = 'trainee'
+          ) AS trainee_turns,
+          (
+            SELECT sm.content FROM session_message sm
+            WHERE sm.session_id = ts.id AND sm.role = 'patient'
+            ORDER BY sm.turn_index DESC LIMIT 1
+          ) AS last_patient_content,
+          (
+            SELECT sm.content FROM session_message sm
+            WHERE sm.session_id = ts.id AND sm.role = 'trainee'
+            ORDER BY sm.turn_index DESC LIMIT 1
+          ) AS last_trainee_content
         FROM training_session ts
         LEFT JOIN feedback_report fr ON fr.session_id = ts.id
+        {user_filter}
         ORDER BY COALESCE(fr.created_at, ts.ended_at, ts.started_at) DESC
         LIMIT ?
         """,
-        (max(1, min(limit, 50)),),
+        tuple(params),
     ).fetchall()
     conn.close()
 
     out: list[dict[str, Any]] = []
     for row in rows:
         d = dict(row)
+        meta_raw = d.pop("meta_json", None)
+        last_patient_content = (d.pop("last_patient_content", None) or "").strip()
+        last_trainee_content = (d.pop("last_trainee_content", None) or "").strip()
+        session_mode = "practice"
+        study_mode = "reference"
+        meta_obj: dict[str, Any] = {}
+        if meta_raw:
+            try:
+                meta_obj = json.loads(meta_raw)
+                session_mode = meta_obj.get("session_mode") or session_mode
+                study_mode = meta_obj.get("study_mode") or study_mode
+            except json.JSONDecodeError:
+                meta_obj = {}
+        d["session_mode"] = session_mode
+        d["study_mode"] = study_mode
+        d["progress_done"] = meta_obj.get("progress_done")
+        d["progress_total"] = meta_obj.get("progress_total")
+        d["progress_pct"] = meta_obj.get("progress_pct")
+        d["last_patient_quote"] = meta_obj.get("last_patient_quote") or last_patient_content[:160]
+        d["last_trainee_quote"] = meta_obj.get("last_trainee_quote") or last_trainee_content[:160]
+        # 旧会话 meta 里可能没有摘要：用最新两轮话补全
+        summary_bits: list[str] = []
+        trainee_turns = d.get("trainee_turns") or 0
+        if trainee_turns:
+            summary_bits.append(f"你说了 {trainee_turns} 轮")
+        if d.get("progress_total"):
+            done = d.get("progress_done") or 0
+            total = d["progress_total"]
+            pct = d.get("progress_pct")
+            if pct is None and total:
+                pct = round(100 * done / total)
+            summary_bits.append(f"检查点约 {done}/{total}" + (f"（{pct}%）" if pct is not None else ""))
+        if d["last_trainee_quote"]:
+            tq = d["last_trainee_quote"]
+            summary_bits.append(f"你最近：「{tq[:72]}{'…' if len(tq) > 72 else ''}」")
+        if d["last_patient_quote"]:
+            pq = d["last_patient_quote"]
+            summary_bits.append(f"受试者最近：「{pq[:80]}{'…' if len(pq) > 80 else ''}」")
+        d["dialogue_summary"] = meta_obj.get("dialogue_summary") or (" · ".join(summary_bits) if summary_bits else None)
         summary = d.pop("summary", None)
         scores_raw = d.pop("scores_json", None)
         d["has_feedback"] = summary is not None
@@ -477,10 +715,13 @@ def list_sessions(db_path: str, limit: int = 20) -> list[dict[str, Any]]:
                 scores_obj = json.loads(scores_raw)
                 d["total_score"] = scores_obj.get("total_score")
                 d["grade_label"] = scores_obj.get("grade_label")
+                d["insufficient_sample"] = bool(scores_obj.get("insufficient_sample"))
             except json.JSONDecodeError:
                 pass
-        if summary and len(summary) > 120:
-            d["summary_preview"] = summary[:120] + "…"
+        if d["status"] == "in_progress":
+            d["summary_preview"] = d.get("dialogue_summary") or summary
+        elif summary and len(summary) > 160:
+            d["summary_preview"] = summary[:160] + "…"
         else:
             d["summary_preview"] = summary
         out.append(d)

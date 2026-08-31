@@ -17,10 +17,18 @@ export function createVoiceController({ onFinalTranscript, onTranscriptUpdate, o
   let abortSpeak = false;
   let interim = '';
   let configured = false;
+  let talkingHeadEnabled = false;
+  let musetalkEnabled = false;
   let finalBuffer = '';
   let wantListen = false;
   let pendingCommit = false;
   let commitTimer = null;
+  /** 仅在为 true 时，学员说话才会截断受试者旁白（默认关，避免环境噪声误触） */
+  let bargeInEnabled = false;
+
+  function setBargeInEnabled(on) {
+    bargeInEnabled = !!on;
+  }
 
   function combinedText() {
     return `${finalBuffer} ${interim}`.trim();
@@ -76,8 +84,13 @@ export function createVoiceController({ onFinalTranscript, onTranscriptUpdate, o
     speaking = false;
     if (currentAudio) {
       try {
-        currentAudio.pause();
-        currentAudio.src = '';
+        if (currentAudio.pause) currentAudio.pause();
+        if (currentAudio.tagName === 'VIDEO') {
+          currentAudio.removeAttribute('src');
+          currentAudio.load?.();
+        } else {
+          currentAudio.src = '';
+        }
       } catch {
         /* ignore */
       }
@@ -91,9 +104,13 @@ export function createVoiceController({ onFinalTranscript, onTranscriptUpdate, o
       const res = await fetch('/api/voice/status');
       const data = await res.json();
       configured = !!data.configured;
+      talkingHeadEnabled = !!data.talking_head?.enabled;
+      musetalkEnabled = !!(data.musetalk?.enabled && data.musetalk?.ready);
       emit({
         model: data.model,
         voiceId: data.voice_id,
+        talkingHeadEnabled,
+        musetalkEnabled,
       });
       return data;
     } catch {
@@ -121,7 +138,7 @@ export function createVoiceController({ onFinalTranscript, onTranscriptUpdate, o
     };
 
     recognition.onspeechstart = () => {
-      if (speaking) stopPlayback();
+      if (speaking && bargeInEnabled) stopPlayback();
     };
 
     recognition.onresult = (event) => {
@@ -280,19 +297,110 @@ export function createVoiceController({ onFinalTranscript, onTranscriptUpdate, o
     emit();
   }
 
-  async function speak(text) {
-    if (!enabled || !text) return false;
+  async function pollVideoJob(jobId, { onTick, signal, intervalMs = 3000 } = {}) {
+    const deadline = Date.now() + 200000;
+    while (Date.now() < deadline) {
+      if (signal?.aborted) return null;
+      await new Promise((r) => setTimeout(r, intervalMs));
+      if (signal?.aborted) return null;
+      try {
+        const res = await fetch(`/api/voice/patient-speak/video/${jobId}`);
+        const job = await res.json();
+        onTick?.(job);
+        if (job.status === 'succeeded' && job.video_url) return job.video_url;
+        if (job.status === 'failed') {
+          emit({ talkingHeadError: job.error || '口型视频生成失败' });
+          return null;
+        }
+      } catch {
+        /* retry */
+      }
+    }
+    emit({ talkingHeadError: '口型视频生成超时' });
+    return null;
+  }
+
+  async function fetchPatientSpeak(text, personaId, emotion) {
+    const res = await fetch('/api/voice/patient-speak', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        text,
+        persona_id: personaId || '',
+        emotion: emotion || '',
+        prefer_talking_video: musetalkEnabled || talkingHeadEnabled,
+      }),
+    });
+    if (res.status === 404) {
+      const ttsRes = await fetch('/api/voice/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      });
+      const ttsData = await ttsRes.json();
+      if (!ttsRes.ok || !ttsData.ok) {
+        throw new Error(ttsData.detail || ttsData.error || '旁白合成失败（请重启后端服务）');
+      }
+      return { ...ttsData, mode: 'audio_only', talking_head_error: '后端未加载说话数字人接口，请重启 uvicorn' };
+    }
+    let data;
+    try {
+      data = await res.json();
+    } catch {
+      throw new Error(`旁白接口异常 HTTP ${res.status}`);
+    }
+    if (!res.ok || !data.ok) {
+      const msg = data.detail || data.error || '旁白合成失败';
+      if (data.soft || /insufficient|balance|余额|quota/i.test(String(msg))) {
+        emit({ talkingHeadError: msg });
+        const err = new Error(msg);
+        err.soft = true;
+        throw err;
+      }
+      if (res.status === 400 || res.status === 503) {
+        throw new Error(msg.includes('未配置') ? `${msg}（可在无语音模式下继续文字对话）` : msg);
+      }
+      throw new Error(msg);
+    }
+    return data;
+  }
+
+  async function playAudioBase64(audioBase64, hooks = {}) {
+    const { onAudio } = hooks;
+    const bin = atob(audioBase64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i);
+    const blob = new Blob([bytes], { type: 'audio/mpeg' });
+    const url = URL.createObjectURL(blob);
+    const audio = new Audio(url);
+    currentAudio = audio;
+    onAudio?.(audio);
+    await new Promise((resolve) => {
+      audio.onended = () => {
+        URL.revokeObjectURL(url);
+        if (currentAudio === audio) currentAudio = null;
+        resolve();
+      };
+      audio.onerror = () => {
+        URL.revokeObjectURL(url);
+        if (currentAudio === audio) currentAudio = null;
+        resolve();
+      };
+      audio.play().catch(() => resolve());
+    });
+  }
+
+  async function speakPatientNarration(text, hooks = {}) {
+    const { onAudio, onEnd, onGenerating, onVideo, personaId, emotion } = hooks;
+    if (!text) return false;
+
     const wasWant = wantListen;
     wantListen = false;
     pendingCommit = false;
     processing = false;
     clearCommitTimer();
     if (listening) {
-      try {
-        recognition?.stop();
-      } catch {
-        /* ignore */
-      }
+      try { recognition?.stop(); } catch { /* ignore */ }
       listening = false;
     }
 
@@ -302,70 +410,118 @@ export function createVoiceController({ onFinalTranscript, onTranscriptUpdate, o
     speaking = true;
     emit({ speaking: true, listening: false, processing: false });
 
+    const abortCtl = { aborted: false };
+    const signal = {
+      get aborted() { return abortSpeak || abortCtl.aborted; },
+    };
+
     try {
-      const res = await fetch('/api/voice/tts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.ok) {
-        speaking = false;
-        emit({
-          speaking: false,
-          error: data.detail || data.error || '旁白合成失败',
-        });
-        if (wasWant) {
-          wantListen = true;
-          startListeningInternal();
-        }
-        return false;
-      }
+      onGenerating?.({ status: 'tts', message: '正在合成语音…' });
+      const data = await fetchPatientSpeak(text, personaId, emotion);
       if (abortSpeak) {
         speaking = false;
         emit({ speaking: false });
+        onEnd?.();
         return false;
       }
 
-      const bin = atob(data.audio_base64);
-      const bytes = new Uint8Array(bin.length);
-      for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i);
-      const blob = new Blob([bytes], { type: 'audio/mpeg' });
-      const url = URL.createObjectURL(blob);
-      const audio = new Audio(url);
-      currentAudio = audio;
+      if (data.mode === 'talking_video' && data.video_url) {
+        onGenerating?.({
+          status: 'video',
+          message: data.cache_hit ? '播放口型视频…' : '口型视频就绪…',
+        });
+        const playPromise = onVideo?.(data.video_url);
+        if (playPromise && typeof playPromise.then === 'function') await playPromise;
+        speaking = false;
+        emit({ speaking: false });
+        onEnd?.();
+        if (wasWant && enabled) { wantListen = true; startListeningInternal(); }
+        return !abortSpeak;
+      }
 
-      await new Promise((resolve) => {
-        audio.onended = () => {
-          URL.revokeObjectURL(url);
-          if (currentAudio === audio) currentAudio = null;
-          resolve();
-        };
-        audio.onerror = () => {
-          URL.revokeObjectURL(url);
-          if (currentAudio === audio) currentAudio = null;
-          resolve();
-        };
-        audio.play().catch(() => resolve());
-      });
+      const musetalkJob = data.mode === 'musetalk_video_job' && data.video_job_id;
+      if (musetalkJob) {
+        onGenerating?.({ status: 'video', message: 'GPU 生成口型视频（音画合一）…' });
+        const videoUrl = await pollVideoJob(data.video_job_id, {
+          signal,
+          intervalMs: 1500,
+          onTick: (job) => {
+            if (job.status === 'running') {
+              onGenerating?.({ status: 'video', message: 'GPU 生成口型视频…' });
+            }
+          },
+        });
+        if (videoUrl && !abortSpeak) {
+          const playPromise = onVideo?.(videoUrl);
+          if (playPromise && typeof playPromise.then === 'function') await playPromise;
+          speaking = false;
+          emit({ speaking: false });
+          onEnd?.();
+          if (wasWant && enabled) { wantListen = true; startListeningInternal(); }
+          return !abortSpeak;
+        }
+        onGenerating?.({ status: 'tts', message: '口型生成失败，仅播放语音…' });
+      }
+
+      let videoPromise = null;
+      if (data.mode === 'audio_with_video_job' && data.video_job_id) {
+        onGenerating?.({ status: 'video', message: '口型视频生成中（MiniMax H3，约 30–90 秒）…' });
+        videoPromise = pollVideoJob(data.video_job_id, {
+          signal,
+          onTick: (job) => {
+            if (job.status === 'running') {
+              onGenerating?.({ status: 'video', message: '口型视频生成中（MiniMax H3）…' });
+            }
+          },
+        });
+      }
+
+      if (data.audio_base64) {
+        await playAudioBase64(data.audio_base64, { onAudio });
+      }
+      if (data.talking_head_error) {
+        emit({ talkingHeadError: data.talking_head_error });
+      }
+
+      if (videoPromise && !abortSpeak) {
+        const videoUrl = await videoPromise;
+        if (videoUrl && !abortSpeak) {
+          stopPlayback();
+          speaking = true;
+          emit({ speaking: true });
+          onGenerating?.({ status: 'video', message: '播放说话画面…' });
+          const playPromise = onVideo?.(videoUrl);
+          if (playPromise && typeof playPromise.then === 'function') await playPromise;
+        }
+      }
 
       speaking = false;
       emit({ speaking: false });
+      onEnd?.();
+      if (wasWant && enabled) {
+        wantListen = true;
+        startListeningInternal();
+      }
       return !abortSpeak;
     } catch (err) {
       speaking = false;
-      emit({
-        speaking: false,
-        error: String(err.message || err),
-      });
+      emit({ speaking: false, error: String(err.message || err) });
+      onEnd?.();
       return false;
     }
+  }
+
+  async function speak(text) {
+    if (!enabled || !text) return false;
+    return speakPatientNarration(text);
   }
 
   return {
     refreshStatus,
     setEnabled,
+    setBargeInEnabled,
     speak,
+    speakPatientNarration,
     stopPlayback,
     startListening,
     stopListening,

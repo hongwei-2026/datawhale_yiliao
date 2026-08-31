@@ -67,6 +67,14 @@ def load_case(case_id: str | None = None) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def invalidate_case_caches() -> None:
+    """管理端写入病例后清空缓存，使下次对话加载新包。"""
+    load_cases_index.cache_clear()
+    load_case.cache_clear()
+    load_rubric.cache_clear()
+    load_rubric_lay.cache_clear()
+
+
 def case_primary_scene(case: dict) -> str:
     script = case.get("session_script") or {}
     if script.get("scene_key"):

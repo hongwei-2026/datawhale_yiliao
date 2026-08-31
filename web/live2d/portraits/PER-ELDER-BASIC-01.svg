@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 520" role="img" aria-label="t7'��J��">
+  <defs>
+    <radialGradient id="face" cx="50%" cy="38%" r="42%">
+      <stop offset="0%" stop-color="#f3dcc8"/>
+      <stop offset="100%" stop-color="#d9b896"/>
+    </radialGradient>
+  </defs>
+  <ellipse cx="180" cy="470" rx="130" ry="28" fill="#0f172a" opacity=".12"/>
+  <path d="M95 500 L265 500 L250 360 Q180 330 110 360 Z" fill="#475569"/>
+  <path d="M120 360 L240 360 L225 250 Q180 220 135 250 Z" fill="#64748b"/>
+  <path d="M142 250 Q180 200 218 250 L210 172 Q180 145 150 172 Z" fill="url(#face)"/>
+  <path d="M112 182 C118 125 148 102 180 102 C212 102 242 125 248 182 C230 170 130 170 112 182 Z" fill="#d4d4d8"/>
+  <path d="M138 168 Q148 158 158 168" stroke="#9ca3af" stroke-width="3" fill="none"/>
+  <path d="M202 168 Q212 158 222 168" stroke="#9ca3af" stroke-width="3" fill="none"/>
+  <ellipse cx="156" cy="200" rx="8" ry="5" fill="#334155"/>
+  <ellipse cx="204" cy="200" rx="8" ry="5" fill="#334155"/>
+  <path d="M164 222 Q180 232 196 222" stroke="#a16207" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <path d="M150 188 L210 188" stroke="#9ca3af" stroke-width="2" opacity=".6"/>
+</svg>
