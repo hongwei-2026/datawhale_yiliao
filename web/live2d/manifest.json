@@ -1,17 +1,33 @@
 {
   "version": 5,
-  "default_visual": "live2d",
+  "default_visual": "portrait",
   "persona_visual": {
-    "PER-HTN-TAXI-01": "live2d",
-    "PER-ELDER-BASIC-01": "live2d",
-    "PER-ELDER-FEMALE-02": "live2d",
-    "default": "live2d"
+    "PER-HTN-TAXI-01": "portrait",
+    "PER-ELDER-BASIC-01": "portrait",
+    "PER-ELDER-FEMALE-02": "portrait",
+    "default": "portrait",
+    "PER-ADM-61A93613": "portrait",
+    "PER-ADM-02F6DA23": "portrait",
+    "PER-ADM-897A7752": "portrait",
+    "PER-ADM-8D00066C": "portrait",
+    "PER-ADM-4CE01C36": "portrait",
+    "PER-ADM-7FA7387A": "live2d",
+    "PER-ADM-2BEE88EC": "live2d",
+    "PER-ADM-72829F36": "live2d"
   },
   "portraits": {
     "PER-HTN-TAXI-01": "/live2d/portraits/PER-HTN-TAXI-01.webp",
     "PER-ELDER-BASIC-01": "/live2d/portraits/PER-ELDER-BASIC-01.webp",
     "PER-ELDER-FEMALE-02": "/live2d/portraits/PER-ELDER-FEMALE-02.webp",
-    "default": "/live2d/portraits/PER-ELDER-BASIC-01.webp"
+    "default": "/live2d/portraits/PER-ELDER-BASIC-01.webp",
+    "PER-ADM-61A93613": "/live2d/portraits/PER-ADM-61A93613.webp",
+    "PER-ADM-02F6DA23": "/live2d/portraits/PER-ADM-02F6DA23.webp",
+    "PER-ADM-897A7752": "/live2d/portraits/PER-ADM-897A7752.webp",
+    "PER-ADM-8D00066C": "/live2d/portraits/PER-ADM-8D00066C.webp",
+    "PER-ADM-4CE01C36": "/live2d/portraits/PER-ADM-4CE01C36.webp",
+    "PER-ADM-7FA7387A": "/live2d/portraits/PER-ADM-7FA7387A.webp",
+    "PER-ADM-2BEE88EC": "/live2d/portraits/PER-ADM-2BEE88EC.webp",
+    "PER-ADM-72829F36": "/live2d/portraits/PER-ADM-72829F36.webp"
   },
   "models": {
     "mark": {

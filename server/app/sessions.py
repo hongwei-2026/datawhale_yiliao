@@ -6,10 +6,16 @@ import json
 from typing import Any
 
 from .agnes import AgnesClient
-from .case_loader import case_primary_scene, load_case, load_rubric
+from .case_loader import (
+    case_disease_code,
+    case_primary_scene,
+    load_case,
+    load_rubric,
+    load_rubric_for_case,
+)
 from .db import connect, new_id, utc_now
-from .patient_agent import generate_patient_opening, generate_patient_reply
-from .patient_engine import default_emotion, public_affect
+from .patient_agent import generate_patient_opening, generate_patient_reply, pick_clarify_reply
+from .patient_engine import affect_log_entry, default_emotion, public_affect
 from .scoring_engine import (
     DISCLAIMER,
     build_insufficient_sample_feedback,
@@ -37,9 +43,11 @@ def create_session(
     meta = case["meta"]
     persona = case["persona"]
     scene_key = case_primary_scene(case)
-    rubric = load_rubric(scene_key)
+    disease_code = case_disease_code(case)
+    rubric = load_rubric_for_case(case, scene_key)
     script = case.get("session_script") or {}
     scene_label = script.get("scene_label") or rubric.get("meta", {}).get("sceneLabel") or scene_key
+    trainee_brief = (rubric.get("meta") or {}).get("traineeBrief") or ""
     session_mode = session_mode if session_mode in ("practice", "assessment") else "practice"
     study_mode = study_mode if study_mode in ("reference", "strict") else "reference"
     if session_mode == "assessment":
@@ -70,6 +78,9 @@ def create_session(
                     "session_mode": session_mode,
                     "study_mode": study_mode,
                     "emotion": initial_emotion,
+                    "disease_code": disease_code,
+                    "scoring_emphasis": trainee_brief,
+                    "rubric_effective": (rubric.get("meta") or {}).get("effective") or {},
                 },
                 ensure_ascii=False,
             ),
@@ -104,6 +115,27 @@ def create_session(
         """,
         (new_id(), sid, 1, "patient", greet, now),
     )
+    # 开场患者句写入情绪日志，便于前端按条展示
+    opening_affect = public_affect(initial_emotion)
+    conn.execute(
+        "UPDATE training_session SET meta_json=? WHERE id=?",
+        (
+            json.dumps(
+                {
+                    "scene_label": scene_label,
+                    "session_mode": session_mode,
+                    "study_mode": study_mode,
+                    "emotion": initial_emotion,
+                    "emotion_log": [affect_log_entry(1, opening_affect)],
+                    "disease_code": disease_code,
+                    "scoring_emphasis": trainee_brief,
+                    "rubric_effective": (rubric.get("meta") or {}).get("effective") or {},
+                },
+                ensure_ascii=False,
+            ),
+            sid,
+        ),
+    )
     conn.commit()
     conn.close()
     return {
@@ -117,6 +149,8 @@ def create_session(
             "disclaimer": meta.get("disclaimer"),
             "scene_key": scene_key,
             "scene_label": scene_label,
+            "disease_code": disease_code,
+            "scoring_emphasis": trainee_brief,
         },
         "persona": {
             "persona_id": persona.get("persona_id"),
@@ -126,7 +160,9 @@ def create_session(
         "session_mode": session_mode,
         "study_mode": study_mode,
         "messages": get_messages(db_path, sid),
-        "patient_affect": public_affect(initial_emotion),
+        "patient_affect": opening_affect,
+        "emotion_log": [affect_log_entry(1, opening_affect)],
+        "scoring_emphasis": trainee_brief,
     }
 
 
@@ -192,8 +228,40 @@ def get_messages(db_path: str, session_id: str) -> list[dict]:
         """,
         (session_id,),
     ).fetchall()
+    sess_row = conn.execute(
+        "SELECT meta_json FROM training_session WHERE id=?",
+        (session_id,),
+    ).fetchone()
     conn.close()
-    return [dict(r) for r in rows]
+    emotion_log: list[dict] = []
+    if sess_row and sess_row["meta_json"]:
+        try:
+            meta = json.loads(sess_row["meta_json"])
+            emotion_log = list(meta.get("emotion_log") or [])
+        except json.JSONDecodeError:
+            emotion_log = []
+    by_turn = {
+        int(e["turn_index"]): e
+        for e in emotion_log
+        if isinstance(e, dict) and e.get("turn_index") is not None
+    }
+    out = []
+    for r in rows:
+        m = dict(r)
+        if m.get("role") == "patient" and int(m.get("turn_index") or -1) in by_turn:
+            m["affect"] = by_turn[int(m["turn_index"])]
+        out.append(m)
+    return out
+
+
+def session_emotion_log(sess: dict | None) -> list[dict]:
+    if not sess or not sess.get("meta_json"):
+        return []
+    try:
+        obj = json.loads(sess["meta_json"])
+        return list(obj.get("emotion_log") or [])
+    except json.JSONDecodeError:
+        return []
 
 
 def post_turn(
@@ -309,7 +377,7 @@ def post_turn(
         INSERT INTO session_message(id, session_id, turn_index, role, content, ai_generation_id, created_at)
         VALUES(?,?,?,?,?,?,?)
         """,
-        (new_id(), session_id, patient_turn, "patient", (gen.get("content") or "").strip() or "嗯……您刚才说的什么？我没太听明白，您能再说一遍吗？", gen_id, ended),
+        (new_id(), session_id, patient_turn, "patient", (gen.get("content") or "").strip() or pick_clarify_reply(hist_for_ai), gen_id, ended),
     )
     all_messages = conn.execute(
         "SELECT turn_index, role, content FROM session_message WHERE session_id=? ORDER BY turn_index",
@@ -317,7 +385,17 @@ def post_turn(
     ).fetchall()
     msg_list = [dict(m) for m in all_messages]
     scene_key = sess.get("scene_key") or "informed_consent"
-    progress = checkpoint_progress(msg_list, scene_key)
+    disease_code = None
+    try:
+        disease_code = (json.loads(sess.get("meta_json") or "{}") or {}).get("disease_code")
+    except json.JSONDecodeError:
+        disease_code = None
+    if not disease_code:
+        try:
+            disease_code = case_disease_code(load_case(sess.get("case_code")))
+        except Exception:
+            disease_code = None
+    progress = checkpoint_progress(msg_list, scene_key, disease_code=disease_code)
     meta_obj: dict[str, Any] = {}
     if sess.get("meta_json"):
         try:
@@ -327,6 +405,10 @@ def post_turn(
     meta_obj.update(progress)
     if gen.get("emotion_state"):
         meta_obj["emotion"] = gen["emotion_state"]
+    affect = gen.get("patient_affect") or public_affect(gen.get("emotion_state") or {})
+    log = list(meta_obj.get("emotion_log") or [])
+    log.append(affect_log_entry(patient_turn, affect))
+    meta_obj["emotion_log"] = log
     conn.execute(
         "UPDATE training_session SET meta_json=? WHERE id=?",
         (json.dumps(meta_obj, ensure_ascii=False), session_id),
@@ -338,10 +420,13 @@ def post_turn(
         "ok": True,
         "trainee_turn": next_turn,
         "patient_reply": gen.get("content"),
+        "patient_ok": bool(gen.get("ok")),
+        "patient_error": None if gen.get("ok") else (gen.get("error") or "模拟病人暂时不可用"),
         "grounding": gen.get("grounding"),
         "latency_ms": gen.get("latency_ms"),
         "messages": get_messages(db_path, session_id),
-        "patient_affect": gen.get("patient_affect"),
+        "patient_affect": affect,
+        "emotion_log": log,
     }
 
 
@@ -374,6 +459,16 @@ def complete_session(
     conn.commit()
 
     scene_key = sess.get("scene_key") or "informed_consent"
+    disease_code = None
+    try:
+        disease_code = (json.loads(sess.get("meta_json") or "{}") or {}).get("disease_code")
+    except json.JSONDecodeError:
+        disease_code = None
+    if not disease_code:
+        try:
+            disease_code = case_disease_code(load_case(sess.get("case_code")))
+        except Exception:
+            disease_code = None
     sample_stats = dialogue_sample_stats(messages)
     if not sample_stats["sufficient"]:
         report = build_insufficient_sample_feedback(sample_stats, scene_key)
@@ -415,7 +510,7 @@ def complete_session(
             "insufficient_sample": True,
         }
 
-    scored = run_scoring(client, messages, scene_key=scene_key)
+    scored = run_scoring(client, messages, scene_key=scene_key, disease_code=disease_code)
     ended = utc_now()
     results = scored["results"]
     report = scored["report"]
@@ -514,8 +609,26 @@ def get_feedback(db_path: str, session_id: str) -> dict[str, Any] | None:
         (session_id,),
     ).fetchall()
     sess = conn.execute("SELECT * FROM training_session WHERE id=?", (session_id,)).fetchone()
+    sess_d = dict(sess) if sess else {}
+    disease_code = None
+    try:
+        disease_code = (json.loads(sess_d.get("meta_json") or "{}") or {}).get("disease_code")
+    except json.JSONDecodeError:
+        disease_code = None
+    if sess_d.get("case_code"):
+        try:
+            case = load_case(sess_d["case_code"])
+            rubric = load_rubric_for_case(case, sess_d.get("scene_key"))
+            if not disease_code:
+                disease_code = case_disease_code(case)
+        except Exception:
+            from .case_loader import load_effective_rubric
 
-    rubric = load_rubric(sess["scene_key"] if sess else "informed_consent")
+            rubric = load_effective_rubric(sess_d.get("scene_key") or "informed_consent", disease_code)
+    else:
+        from .case_loader import load_effective_rubric
+
+        rubric = load_effective_rubric("informed_consent", None)
     item_map = {i["id"]: i for i in rubric["items"]}
     from .case_loader import load_rubric_lay
 
@@ -612,11 +725,13 @@ def list_sessions(
     *,
     actor_role: str | None = None,
 ) -> list[dict[str, Any]]:
-    """最近练习会话（含是否有反馈、摘要预览）。管理员可见全部账号的会话。"""
+    """最近练习会话（含是否有反馈、摘要预览）。默认只看当前账号，避免管理员被学员旧记录刷屏。"""
     conn = _conn(db_path)
     params: list[Any] = []
     user_filter = ""
-    if trainee_user_id and (actor_role or "").lower() != "admin":
+    # actor_role 保留兼容；对话记录一律按当前登录用户过滤
+    _ = actor_role
+    if trainee_user_id:
         user_filter = "WHERE ts.trainee_user_id = ?"
         params.append(trainee_user_id)
     params.append(max(1, min(limit, 100)))

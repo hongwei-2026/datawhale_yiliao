@@ -5,7 +5,7 @@
  * - 背景：CSS 诊室 + 可选 MiniMax 生成图（scripts/generate_persona_assets.py）
  */
 
-import { createLive2DEngine, loadLive2DManifest } from './live2d-loader.js';
+import { createLive2DEngine, loadLive2DManifest } from './live2d-loader.js?v=20260909chat';
 import { createAvatar3DEngine } from './avatar3d.js';
 
 const PERSONA_META = {
@@ -477,8 +477,12 @@ export function createDigitalHumanController({ onStatus } = {}) {
       mountEl = null;
     },
     relayout() {
-      live2d.layout();
-      avatar3d.layout();
+      try {
+        live2d.layout?.();
+      } catch { /* ignore */ }
+      try {
+        avatar3d.layout?.();
+      } catch { /* ignore */ }
     },
     setPersona({ personaCode: code, displayName: name }) {
       attach(mountEl || stageHolder, { personaCode: code, displayName: name });

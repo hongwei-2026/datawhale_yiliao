@@ -1,0 +1,33 @@
+{
+  "meta": {
+    "scene_key": "follow_up",
+    "disease_code": "T2DM",
+    "version": "1.0.0",
+    "basedOnSceneRubric": "scoring-rubric-followup.json",
+    "changelog": "糖尿病随访：关闭「家庭血压记录」通用项（非本品核心）；沟通维 20%→25%；侧重点改为低血糖与用药时点"
+  },
+  "scoringModelPatch": {
+    "dimensions": [
+      { "id": "redline", "weight": 0, "isGate": true },
+      { "id": "L1", "weight": 0.5 },
+      { "id": "L2", "weight": 0.25 },
+      { "id": "communication", "weight": 0.25 }
+    ]
+  },
+  "itemOverrides": [
+    {
+      "id": "FU-A06",
+      "enabledMvp": false,
+      "reason": "非糖尿病随访核心考点；避免血压日记噪声"
+    },
+    {
+      "id": "FU-A02",
+      "enabledMvp": true,
+      "reason": "不适/低血糖相关体感仍纳入核查"
+    }
+  ],
+  "emphasis": {
+    "traineeBrief": "本局侧重：漏服与用药时点、不适/低血糖相关体感、合并用药；平和追问，勿责备。",
+    "instructorNote": "关闭 FU-A06；沟通维略增，强调非责备问法。"
+  }
+}

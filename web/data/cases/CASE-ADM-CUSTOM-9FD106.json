@@ -1,0 +1,273 @@
+{
+  "meta": {
+    "case_id": "CASE-ADM-CUSTOM-9FD106",
+    "title": "陈美玲 · 随访（询问）",
+    "short_title": "陈美玲 · 随访（询问）",
+    "data_status": "reviewed",
+    "version": "0.1.0",
+    "phase": "II",
+    "locale": "zh-CN",
+    "is_default": false,
+    "mvp_scenes": [
+      "S5"
+    ],
+    "source_refs": [
+      {
+        "type": "admin_ingest",
+        "title": "用户输入",
+        "note": "mode=human; draft=DRAFT-42587DB7-E"
+      }
+    ],
+    "disclaimer": "本病例为教学模拟 SP 案例，由管理端审核发布。"
+  },
+  "disease": {
+    "disease_code": "T2DM",
+    "name_zh": "2型糖尿病",
+    "icd10": "E11",
+    "description": "管理端接入 · 随访（询问）"
+  },
+  "protocol": {
+    "protocol_code": "PROTO-T2DM-ADM",
+    "title": "2型糖尿病试验方案（管理端接入）",
+    "phase": "II",
+    "is_placeholder": true,
+    "status": "active"
+  },
+  "session_script": {
+    "scene_key": "follow_up",
+    "scene_label": "随访（询问）",
+    "scene_codes": [
+      "S5"
+    ],
+    "visit_context": "【病例全文 · 纯人写测试样例】",
+    "system_opening": "你正在进行随访（询问）训练。受试者：陈美玲。",
+    "patient_greeting": "【人物怎么说】",
+    "patient_greeting_seeds": [
+      "【人物怎么说】",
+      "说话有条理，会先问「是不是我的问题」；听到专业词会要求用白话；被问漏服时会不好意思，需要给台阶。",
+      "陈老师您好，我是随访护士小周。今天按第 8 周约定给您打个电话，大概十分钟，看看血糖记录和吃药情况，您现在方便吗？",
+      "方便的。就是……我最近有几次血糖特别低，心里有点慌，不知道是不是药的问题。"
+    ],
+    "opening_themes": [
+      "担心与信任"
+    ],
+    "trainee_role_hint": "态度平和、把关键信息讲清/问清；不要一开始责备。"
+  },
+  "clinical_summary": {
+    "chief_complaint": "【病例全文 · 纯人写测试样例】",
+    "history_present": [
+      "【病例全文 · 纯人写测试样例】",
+      "职业：中学化学老师",
+      "场景：随访（询问）——2型糖尿病 II 期试验 · 第 8 周电话随访",
+      "按方案做第 8 周电话随访。核对近两周血糖日记、是否按时吃药、有没有低血糖或胃肠道不适；提醒下次来医院抽血的时间；不要替学员做加减药决定。"
+    ],
+    "history_past": [],
+    "social_notes": "【病例全文 · 纯人写测试样例】 姓名：陈美玲 性别：女 年龄：52岁 职业：中学化学老师 场景：随访（询问）——2型糖尿病 II 期试验 · 第 8 周电话随访  【今天来干嘛】 按方案做第 8 周电话随访。核对近两周血糖日记、是否按时吃"
+  },
+  "adherence_facts": {
+    "missed_doses": [],
+    "note": "见锁死事实"
+  },
+  "symptoms": [
+    {
+      "symptom_id": "SYM-ADM-01",
+      "name": "【病例全文 · 纯人写测试样例】",
+      "is_core": true,
+      "present": true,
+      "lay_description": "【病例全文 · 纯人写测试样例】",
+      "source": "admin_ingest_locked_fact"
+    },
+    {
+      "symptom_id": "SYM-ADM-02",
+      "name": "职业：中学化学老师",
+      "is_core": true,
+      "present": true,
+      "lay_description": "职业：中学化学老师",
+      "source": "admin_ingest_locked_fact"
+    },
+    {
+      "symptom_id": "SYM-ADM-03",
+      "name": "场景：随访（询问）——2型糖尿病 II 期试验 · 第 8 周电话随访",
+      "is_core": true,
+      "present": true,
+      "lay_description": "场景：随访（询问）——2型糖尿病 II 期试验 · 第 8 周电话随访",
+      "source": "admin_ingest_locked_fact"
+    },
+    {
+      "symptom_id": "SYM-ADM-04",
+      "name": "按方案做第 8 周电话随访。核对近两周血糖日记、是否按时吃药、有没有低血糖或胃肠道不适；提醒下次",
+      "is_core": true,
+      "present": true,
+      "lay_description": "按方案做第 8 周电话随访。核对近两周血糖日记、是否按时吃药、有没有低血糖或胃肠道不适；提醒下次来医院抽血的时间；不要替学员做加减药决定。",
+      "source": "admin_ingest_locked_fact"
+    }
+  ],
+  "concomitant_events": [],
+  "inclusion_hints": [],
+  "exclusion_hints": [],
+  "comorbidities": [],
+  "medication": {
+    "investigational_summary": "",
+    "concomitant_drugs": []
+  },
+  "risks": [
+    {
+      "risk_id": "RISK-ADM-01",
+      "title": "担心与信任",
+      "must_disclose": false,
+      "description": "输入中出现怕/担心类表述"
+    }
+  ],
+  "benefits": [],
+  "visits": [
+    {
+      "visit_id": "V-ADM-01",
+      "name": "随访（询问）",
+      "timing": "【病例全文 · 纯人写测试样例】",
+      "procedures": [
+        "【病例全文 · 纯人写测试样例】"
+      ]
+    }
+  ],
+  "lab_hints": [],
+  "forbidden_fabrications": [
+    {
+      "forbidden_id": "FB-ADM-01",
+      "category": "claim",
+      "description": "不得编造未登记的严重不良事件",
+      "remediating_reply": "这个我不太清楚，您再问问研究医生吧。"
+    }
+  ],
+  "persona": {
+    "persona_id": "PER-ADM-4CE01C36",
+    "display_name": "陈美玲",
+    "display_label": "陈美玲",
+    "age_years": 52,
+    "sex": "female",
+    "emotion_baseline": "anxious_mild",
+    "concealment_tendency": "moderate",
+    "occupation": "",
+    "lay_bio": "【病例全文 · 纯人写测试样例】 姓名：陈美玲 性别：女 年龄：52岁 职业：中学化学老师 场景：随访（询问）——2型糖尿病 II 期试验 · 第 8 周电话随访  【今天来干嘛】 按方案做第 8 周电话随访。核对近两周血糖日记、是否按时吃"
+  },
+  "key_concerns": [
+    {
+      "concern_id": "KC-ADM-01",
+      "topic": "担心与信任",
+      "patient_may_ask": [],
+      "researcher_should_cover": "输入中出现怕/担心类表述",
+      "disclosure_rule": "担心被批评或不被理解",
+      "source": "用户自写全文",
+      "reason": "输入中出现怕/担心类表述"
+    }
+  ],
+  "dialogue_hints": {
+    "if_blame": {
+      "trigger_patterns": [
+        "责备",
+        "怎么能"
+      ],
+      "response": "我也不是故意的…",
+      "behavior": "更短、更防备",
+      "source": "用户自写全文",
+      "reason": "默认接话倾向；路径丙若用户未写则保持模板并标来源"
+    }
+  },
+  "ingest_meta": {
+    "draft_id": "DRAFT-42587DB7-E",
+    "mode": "human",
+    "scoring_hints": [
+      {
+        "text": "练习时需覆盖大类「沟通方式与人文」相关沟通要点",
+        "source": "本场景评分清单 · G-01 沟通方式与人文",
+        "reason": "病例挂靠已有场景，评分不新造；此条为挂钩说明而非新得分点",
+        "confidence": "high",
+        "rubric_group_id": "G-01",
+        "rubric_group_name": "沟通方式与人文"
+      },
+      {
+        "text": "练习时需覆盖大类「用药与依从核查」相关沟通要点",
+        "source": "本场景评分清单 · G-02 用药与依从核查",
+        "reason": "病例挂靠已有场景，评分不新造；此条为挂钩说明而非新得分点",
+        "confidence": "high",
+        "rubric_group_id": "G-02",
+        "rubric_group_name": "用药与依从核查"
+      },
+      {
+        "text": "练习时需覆盖大类「随访安排与安全」相关沟通要点",
+        "source": "本场景评分清单 · G-03 随访安排与安全",
+        "reason": "病例挂靠已有场景，评分不新造；此条为挂钩说明而非新得分点",
+        "confidence": "high",
+        "rubric_group_id": "G-03",
+        "rubric_group_name": "随访安排与安全"
+      },
+      {
+        "text": "练习时需覆盖大类「红线」相关沟通要点",
+        "source": "本场景评分清单 · G-R 红线",
+        "reason": "病例挂靠已有场景，评分不新造；此条为挂钩说明而非新得分点",
+        "confidence": "high",
+        "rubric_group_id": "G-R",
+        "rubric_group_name": "红线"
+      }
+    ],
+    "locked_facts_annotated": [
+      {
+        "text": "【病例全文 · 纯人写测试样例】",
+        "source": "用户自写全文",
+        "reason": "纯人写映射，未改写",
+        "confidence": "high",
+        "source_span": "【病例全文 · 纯人写测试样例】"
+      },
+      {
+        "text": "职业：中学化学老师",
+        "source": "用户自写全文",
+        "reason": "纯人写映射，未改写",
+        "confidence": "high",
+        "source_span": "职业：中学化学老师"
+      },
+      {
+        "text": "场景：随访（询问）——2型糖尿病 II 期试验 · 第 8 周电话随访",
+        "source": "用户自写全文",
+        "reason": "纯人写映射，未改写",
+        "confidence": "high",
+        "source_span": "场景：随访（询问）——2型糖尿病 II 期试验 · 第 8 周电话随访"
+      },
+      {
+        "text": "按方案做第 8 周电话随访。核对近两周血糖日记、是否按时吃药、有没有低血糖或胃肠道不适；提醒下次来医院抽血的时间；不要替学员做加减药决定。",
+        "source": "用户自写全文",
+        "reason": "纯人写映射，未改写",
+        "confidence": "high",
+        "source_span": "按方案做第 8 周电话随访。核对近两周血糖日记、是否按时吃药、有没有低血糖或胃肠道不适；提醒下次来医院抽血的时间；不要替学员做加减药决定。"
+      }
+    ],
+    "openings_annotated": [
+      {
+        "text": "【人物怎么说】",
+        "source": "用户自写全文",
+        "reason": "用户原文开场",
+        "confidence": "high",
+        "source_span": "【人物怎么说】"
+      },
+      {
+        "text": "说话有条理，会先问「是不是我的问题」；听到专业词会要求用白话；被问漏服时会不好意思，需要给台阶。",
+        "source": "用户自写全文",
+        "reason": "用户原文开场",
+        "confidence": "high",
+        "source_span": "说话有条理，会先问「是不是我的问题」；听到专业词会要求用白话；被问漏服时会不好意思，需要给台阶。"
+      },
+      {
+        "text": "陈老师您好，我是随访护士小周。今天按第 8 周约定给您打个电话，大概十分钟，看看血糖记录和吃药情况，您现在方便吗？",
+        "source": "用户自写全文",
+        "reason": "用户原文开场",
+        "confidence": "high",
+        "source_span": "「陈老师您好，我是随访护士小周。今天按第 8 周约定给您打个电话，大概十分钟，看看血糖记录和吃药情况，您现在方便吗？」"
+      },
+      {
+        "text": "方便的。就是……我最近有几次血糖特别低，心里有点慌，不知道是不是药的问题。",
+        "source": "用户自写全文",
+        "reason": "用户原文开场",
+        "confidence": "high",
+        "source_span": "「方便的。就是……我最近有几次血糖特别低，心里有点慌，不知道是不是药的问题。」"
+      }
+    ]
+  }
+}

@@ -7,7 +7,12 @@
       "status": "mvp",
       "statusLabel": "一期必做",
       "description": "研究者向试验参与者/代理人充分告知并获取自愿同意",
-      "primaryStandards": ["gcp-2020", "gcp-2026", "helsinki-2024", "ethics-2023"]
+      "primaryStandards": [
+        "gcp-2020",
+        "gcp-2026",
+        "helsinki-2024",
+        "ethics-2023"
+      ]
     },
     {
       "id": "risk_explanation",
@@ -16,7 +21,10 @@
       "status": "planned",
       "statusLabel": "预留",
       "description": "平衡、准确地说明试验风险与获益不确定性",
-      "primaryStandards": ["gcp-2020", "ich-e6-r3"]
+      "primaryStandards": [
+        "gcp-2020",
+        "ich-e6-r3"
+      ]
     },
     {
       "id": "medication",
@@ -25,7 +33,10 @@
       "status": "planned",
       "statusLabel": "预留",
       "description": "说明用药方法、了解依从性与合并用药",
-      "primaryStandards": ["gcp-2020", "gcp-2026"]
+      "primaryStandards": [
+        "gcp-2020",
+        "gcp-2026"
+      ]
     },
     {
       "id": "adherence",
@@ -34,7 +45,10 @@
       "status": "beta",
       "statusLabel": "高血压案例可用",
       "description": "识别并讨论漏服、错服等不依从问题",
-      "primaryStandards": ["gcp-2020", "gcp-2026"]
+      "primaryStandards": [
+        "gcp-2020",
+        "gcp-2026"
+      ]
     },
     {
       "id": "follow_up",
@@ -43,7 +57,24 @@
       "status": "beta",
       "statusLabel": "高血压案例可用",
       "description": "随访期间 AE 处理、依从性核对与联系方式安排",
-      "primaryStandards": ["gcp-2020", "gcp-2026"]
+      "primaryStandards": [
+        "gcp-2020",
+        "gcp-2026"
+      ]
+    },
+    {
+      "id": "家属协同沟通",
+      "name": "家属协同沟通",
+      "title": "家属协同沟通",
+      "status": "mvp",
+      "statusLabel": "正式",
+      "description": "受试者带来家属，练习同时安抚家属关切与讲清试验要点",
+      "summary": "受试者带来家属，练习同时安抚家属关切与讲清试验要点",
+      "enabled": true,
+      "primaryStandards": [
+        "gcp-2020"
+      ],
+      "tier": "formal"
     }
   ]
 }

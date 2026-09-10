@@ -1,0 +1,25 @@
+{
+  "meta": {
+    "scene_key": "informed_consent",
+    "disease_code": "T2DM",
+    "version": "1.0.0",
+    "basedOnSceneRubric": "scoring-rubric.json",
+    "changelog": "糖尿病知情：关切维 30%→35%、L1 50%→45%；侧重点对齐代谢风险与生活方式"
+  },
+  "scoringModelPatch": {
+    "dimensions": [
+      { "id": "redline", "weight": 0, "isGate": true },
+      { "id": "L1", "weight": 0.45 },
+      { "id": "L2", "weight": 0.2 },
+      { "id": "concern", "weight": 0.35 }
+    ]
+  },
+  "itemOverrides": [
+    { "id": "CC-03", "enabledMvp": true, "reason": "副作用/代谢相关关切为本品重点" },
+    { "id": "IC-C04", "enabledMvp": true, "reason": "风险与不便须讲清" }
+  ],
+  "emphasis": {
+    "traineeBrief": "本局侧重：试验目的与代谢相关风险、生活方式影响、退出权；用通俗话回应担心。",
+    "instructorNote": "关切维略增，引导学员多练风险/疗效关切回应。"
+  }
+}

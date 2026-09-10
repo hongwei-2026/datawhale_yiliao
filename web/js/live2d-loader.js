@@ -7,6 +7,7 @@
 
 const LIB_BASES = ['/live2d/lib', '/static/live2d/lib'];
 const MANIFEST_URLS = ['/live2d/manifest.json', '/static/live2d/manifest.json'];
+const LIB_CACHE_BUST = '20260906demo';
 
 const RUNTIME_STEPS = [
   { file: 'live2dcubismcore.min.js', ready: () => !!window.Live2DCubismCore },
@@ -48,15 +49,15 @@ function injectScript(url) {
 
 async function resolveLibUrl(file) {
   for (const base of LIB_BASES) {
-    const url = `${base}/${file}`;
+    const url = `${base}/${file}?v=${LIB_CACHE_BUST}`;
     try {
-      const res = await fetch(url, { method: 'HEAD' });
+      const res = await fetch(url, { method: 'HEAD', cache: 'force-cache' });
       if (res.ok) return url;
     } catch {
       /* try next */
     }
   }
-  return `${LIB_BASES[0]}/${file}`;
+  return `${LIB_BASES[0]}/${file}?v=${LIB_CACHE_BUST}`;
 }
 
 export async function ensureLive2DRuntime() {
@@ -85,7 +86,7 @@ export async function loadLive2DManifest() {
   let lastErr = null;
   for (const url of MANIFEST_URLS) {
     try {
-      const res = await fetch(url, { cache: 'no-cache' });
+      const res = await fetch(`${url}?v=${LIB_CACHE_BUST}`, { cache: 'force-cache' });
       if (!res.ok) continue;
       manifestCache = await res.json();
       return manifestCache;
@@ -182,12 +183,14 @@ export function createLive2DEngine() {
         return;
       }
       if (audioAnalyser) {
-        const buf = new Uint8Array(audioAnalyser.frequencyBinCount);
-        audioAnalyser.getByteFrequencyData(buf);
-        const avg = buf.reduce((a, b) => a + b, 0) / (buf.length || 1);
-        setMouth(Math.min(1, avg / 90));
+        const data = new Uint8Array(audioAnalyser.frequencyBinCount);
+        audioAnalyser.getByteFrequencyData(data);
+        let sum = 0;
+        for (let i = 0; i < data.length; i += 1) sum += data[i];
+        const avg = sum / Math.max(data.length, 1) / 255;
+        setMouth(Math.min(1, avg * 2.2));
       } else {
-        setMouth(0.25 + Math.abs(Math.sin(Date.now() / 85)) * 0.45);
+        setMouth(0.25 + Math.sin(Date.now() / 90) * 0.2);
       }
     };
     app.ticker.add(lipTicker);
@@ -206,17 +209,12 @@ export function createLive2DEngine() {
     const group = modelCfg?.idleMotionGroupName || 'Idle';
     idleTimer = setTimeout(() => {
       try {
-        const defs = model.internalModel?.motionManager?.definitions;
-        const motions = defs?.get?.(group) || defs?.[group];
-        const count = Array.isArray(motions) ? motions.length : (motions?.length ?? 0);
-        if (count > 0) {
-          model.motion(group, Math.floor(Math.random() * count));
-        }
+        model.motion(group);
       } catch {
-        /* optional */
+        /* ignore */
       }
       scheduleIdleMotion();
-    }, thinking ? 1800 : 4200);
+    }, 4500 + Math.random() * 3500);
   }
 
   function applyExpression(name) {
@@ -224,31 +222,38 @@ export function createLive2DEngine() {
     try {
       model.expression(name);
     } catch {
-      /* optional */
+      /* ignore */
     }
   }
 
   function refreshEmotion() {
-    if (!modelCfg?.emotionMap) return;
-    if (speaking) {
-      applyExpression(modelCfg.emotionMap.speaking || modelCfg.emotionMap.neutral);
-    } else {
-      applyExpression(modelCfg.emotionMap.neutral);
-    }
+    const map = modelCfg?.emotionMap || {};
+    if (speaking) applyExpression(map.speaking);
+    else if (thinking) applyExpression(map.thinking);
+    else applyExpression(map.neutral);
   }
 
   async function initPixi(host) {
-    if (app) return;
     await ensureLive2DRuntime();
     const { PIXI } = libs();
+    if (!PIXI?.Application) throw new Error('PixiJS 未就绪');
+
+    if (app) {
+      hostEl = host;
+      if (app.view && !host.contains(app.view)) host.appendChild(app.view);
+      layoutModel();
+      return;
+    }
+
+    hostEl = host;
     app = new PIXI.Application({
       backgroundAlpha: 0,
       antialias: true,
-      resolution: Math.min(window.devicePixelRatio || 1, 2),
       autoDensity: true,
-      width: Math.max(host.clientWidth, 320),
-      height: Math.max(host.clientHeight, 360),
+      resolution: Math.min(window.devicePixelRatio || 1, 2),
+      resizeTo: host,
     });
+    app.view.classList.add('dh-live2d-canvas');
     host.appendChild(app.view);
     resizeObs = new ResizeObserver(() => layoutModel());
     resizeObs.observe(host);
@@ -276,6 +281,7 @@ export function createLive2DEngine() {
       loadedKey = '';
     }
 
+    // 简单直载：不再做 blob / 预拉 / 强刷，保证演示流畅
     const instance = await Live2DModel.from(cfg.path, { autoInteract: false });
     modelCfg = cfg;
     model = instance;
@@ -298,6 +304,11 @@ export function createLive2DEngine() {
       if (app?.view && !host.contains(app.view)) {
         host.appendChild(app.view);
       }
+      layoutModel();
+    },
+
+    /** digital-human / 布局变更时调用 */
+    layout() {
       layoutModel();
     },
 
@@ -338,69 +349,56 @@ export function createLive2DEngine() {
       refreshEmotion();
     },
 
-    attachAudio(audioEl) {
-      if (!audioEl) return;
+    attachAudio(audio) {
+      if (!audio) return;
       try {
-        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        if (audioSource) {
-          try { audioSource.disconnect(); } catch { /* ignore */ }
+        if (!audioCtx) {
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         }
         audioAnalyser = audioCtx.createAnalyser();
         audioAnalyser.fftSize = 256;
-        audioSource = audioCtx.createMediaElementSource(audioEl);
+        audioSource = audioCtx.createMediaElementSource(audio);
         audioSource.connect(audioAnalyser);
         audioAnalyser.connect(audioCtx.destination);
       } catch {
         audioAnalyser = null;
       }
-      speaking = true;
-      startLipTicker();
     },
 
     detachAudio() {
-      speaking = false;
-      stopLipTicker();
-      if (audioSource) {
-        try { audioSource.disconnect(); } catch { /* ignore */ }
-        audioSource = null;
+      try {
+        audioSource?.disconnect();
+      } catch {
+        /* ignore */
       }
+      audioSource = null;
       audioAnalyser = null;
-      scheduleIdleMotion();
-    },
-
-    layout() {
-      layoutModel();
     },
 
     destroy() {
       this.unmount();
+      this.detachAudio();
+      stopLipTicker();
       clearIdleTimer();
-      if (resizeObs) {
-        resizeObs.disconnect();
-        resizeObs = null;
+      resizeObs?.disconnect();
+      resizeObs = null;
+      try {
+        model?.destroy();
+      } catch {
+        /* ignore */
       }
-      if (model) {
-        try { model.destroy(); } catch { /* ignore */ }
-        model = null;
+      model = null;
+      try {
+        app?.destroy(true);
+      } catch {
+        /* ignore */
       }
-      if (app) {
-        try { app.destroy(true, { children: true, texture: true, baseTexture: true }); } catch { /* ignore */ }
-        app = null;
-      }
+      app = null;
       loadedKey = '';
-      modelCfg = null;
-      if (audioCtx) {
-        try { audioCtx.close(); } catch { /* ignore */ }
-        audioCtx = null;
-      }
     },
 
     getState() {
       return { loadedKey, speaking, thinking, ready: !!model };
-    },
-
-    setMood(expName) {
-      if (expName) applyExpression(expName);
     },
   };
 }

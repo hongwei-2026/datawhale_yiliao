@@ -1,0 +1,496 @@
+{
+  "meta": {
+    "case_id": "CASE-ADM-CUSTOM-777524",
+    "title": "王秀英 · 随访（询问） · 随访（询问）",
+    "short_title": "王秀英 · 随访（询问） · 随访（询问）",
+    "data_status": "reviewed",
+    "version": "0.1.0",
+    "phase": "III",
+    "locale": "zh-CN",
+    "is_default": false,
+    "mvp_scenes": [
+      "S5"
+    ],
+    "source_refs": [
+      {
+        "type": "admin_ingest",
+        "title": "用户大概",
+        "note": "mode=rough; draft=DRAFT-CCA21A19-A"
+      }
+    ],
+    "disclaimer": "本病例为教学模拟 SP 案例，由管理端审核发布。"
+  },
+  "disease": {
+    "disease_code": "HTN",
+    "name_zh": "高血压",
+    "icd10": "I10",
+    "description": "管理端接入 · 随访（询问）"
+  },
+  "protocol": {
+    "protocol_code": "PROTO-HTN-ADM",
+    "title": "高血压试验方案（管理端接入）",
+    "phase": "III",
+    "is_placeholder": true,
+    "status": "active"
+  },
+  "session_script": {
+    "scene_key": "follow_up",
+    "scene_label": "随访（询问）",
+    "scene_codes": [
+      "S5"
+    ],
+    "visit_context": "第4周随访，询问为主，含生命体征测量。试验为某ARB类降压药治疗高血压的III期临床试验，每日一次口服。桌上可见药盒（剩余约85%）、受试者日记本、血压记录表。",
+    "system_opening": "你正在进行随访（询问）训练。受试者：王秀英 · 随访（询问）。",
+    "patient_greeting": "先测量血压，建立舒适氛围后再切入服药询问。",
+    "patient_greeting_seeds": [
+      "先测量血压，建立舒适氛围后再切入服药询问。",
+      "用'基本都吃了'之后的追问打开话题：'能具体说说上周哪天忘了吗？'",
+      "发现药盒剩余85%与'基本都吃了'存在矛盾时，以客观观察切入而非直接质疑。",
+      "50 岁",
+      "纺织厂女工（三班倒，近期白班）",
+      "已婚，有一女（32 岁，住同城）；丈夫退休在家",
+      "内向、怕麻烦人、对医生有敬畏感，不善表达"
+    ],
+    "opening_themes": [
+      "medication_adherence",
+      "psychological_concern",
+      "adverse_event",
+      "diary_compliance"
+    ],
+    "trainee_role_hint": "态度平和、把关键信息讲清/问清；不要一开始责备。"
+  },
+  "clinical_summary": {
+    "chief_complaint": "第4周随访，询问为主，含生命体征测量。试验为某ARB类降压药治疗高血压的III期临床试验，每日一次口服。桌上可见药盒（剩余约85%）、受试者日记本、血压记录表。",
+    "history_present": [
+      "过去7天实际服药5天，漏服2次：第2天出门上班太急忘带药；第5天去女儿家过夜忘记带药。",
+      "第3天下午出现过一次头晕，持续约10分钟，自行休息后缓解；头晕后未联系研究团队，也未在日记中记录。",
+      "受试者担心被批评'不配合'，担心漏服导致被退出试验，不敢主动说漏服。",
+      "药盒剩余约85%，日记中未记录漏服。",
+      "日常服用钙片每日1片，与研究药物无已知相互作用。"
+    ],
+    "history_past": [],
+    "social_notes": ""
+  },
+  "adherence_facts": {
+    "missed_doses": [],
+    "note": "见锁死事实"
+  },
+  "symptoms": [
+    {
+      "symptom_id": "SYM-ADM-01",
+      "name": "过去7天实际服药5天，漏服2次：第2天出门上班太急忘带药；第5天去女儿家过夜忘记带药。",
+      "is_core": true,
+      "present": true,
+      "lay_description": "过去7天实际服药5天，漏服2次：第2天出门上班太急忘带药；第5天去女儿家过夜忘记带药。",
+      "source": "admin_ingest_locked_fact"
+    },
+    {
+      "symptom_id": "SYM-ADM-02",
+      "name": "第3天下午出现过一次头晕，持续约10分钟，自行休息后缓解；头晕后未联系研究团队，也未在日记中记录",
+      "is_core": true,
+      "present": true,
+      "lay_description": "第3天下午出现过一次头晕，持续约10分钟，自行休息后缓解；头晕后未联系研究团队，也未在日记中记录。",
+      "source": "admin_ingest_locked_fact"
+    },
+    {
+      "symptom_id": "SYM-ADM-03",
+      "name": "受试者担心被批评'不配合'，担心漏服导致被退出试验，不敢主动说漏服。",
+      "is_core": true,
+      "present": true,
+      "lay_description": "受试者担心被批评'不配合'，担心漏服导致被退出试验，不敢主动说漏服。",
+      "source": "admin_ingest_locked_fact"
+    },
+    {
+      "symptom_id": "SYM-ADM-04",
+      "name": "药盒剩余约85%，日记中未记录漏服。",
+      "is_core": true,
+      "present": true,
+      "lay_description": "药盒剩余约85%，日记中未记录漏服。",
+      "source": "admin_ingest_locked_fact"
+    },
+    {
+      "symptom_id": "SYM-ADM-05",
+      "name": "日常服用钙片每日1片，与研究药物无已知相互作用。",
+      "is_core": true,
+      "present": true,
+      "lay_description": "日常服用钙片每日1片，与研究药物无已知相互作用。",
+      "source": "admin_ingest_locked_fact"
+    }
+  ],
+  "concomitant_events": [],
+  "inclusion_hints": [],
+  "exclusion_hints": [],
+  "comorbidities": [],
+  "medication": {
+    "investigational_summary": "",
+    "concomitant_drugs": []
+  },
+  "risks": [
+    {
+      "risk_id": "RISK-ADM-01",
+      "title": "medication_adherence",
+      "must_disclose": false,
+      "description": "核心训练目标之一，评估研究者追问依从性的技巧。"
+    },
+    {
+      "risk_id": "RISK-ADM-02",
+      "title": "psychological_concern",
+      "must_disclose": false,
+      "description": "核心训练目标之二，评估研究者人文沟通能力。"
+    },
+    {
+      "risk_id": "RISK-ADM-03",
+      "title": "adverse_event",
+      "must_disclose": false,
+      "description": "安全性随访要点，评估研究者对不良事件的关注与引导。"
+    },
+    {
+      "risk_id": "RISK-ADM-04",
+      "title": "diary_compliance",
+      "must_disclose": false,
+      "description": "随访质量核查要点，评估研究者对数据完整性的重视。"
+    },
+    {
+      "risk_id": "RISK-ADM-05",
+      "title": "担心被研究医生批评\"不配合\"",
+      "must_disclose": false,
+      "description": "老师意见较笼统（内容少了），已对照案例文稿补具体内容，请再核对"
+    },
+    {
+      "risk_id": "RISK-ADM-06",
+      "title": "不敢主动说漏服，怕影响自己在医生心中的印象",
+      "must_disclose": false,
+      "description": "老师意见较笼统（内容少了），已对照案例文稿补具体内容，请再核对"
+    }
+  ],
+  "benefits": [],
+  "visits": [
+    {
+      "visit_id": "V-ADM-01",
+      "name": "随访（询问）",
+      "timing": "第4周随访，询问为主，含生命体征测量。试验为某ARB类降压药治疗高血压的III期临床试验，每日一次口服。桌上可见药盒（剩余约85%）、受试者日记本、血压记录表。",
+      "procedures": [
+        "第4周随访，询问为主，含生命体征测量。试验为某ARB类降压药治疗高血压的III期临床试验，每日一次口服。桌上可见药盒（剩余约85%）、受试者日记本、血压记录表。"
+      ]
+    }
+  ],
+  "lab_hints": [],
+  "forbidden_fabrications": [
+    {
+      "forbidden_id": "FB-ADM-01",
+      "category": "claim",
+      "description": "直接指责受试者'你怎么没按时吃药'或'你漏服了两次'。",
+      "remediating_reply": "这个我不太清楚，您再问问研究医生吧。"
+    },
+    {
+      "forbidden_id": "FB-ADM-02",
+      "category": "claim",
+      "description": "暗示或明示漏服会导致退出试验。",
+      "remediating_reply": "这个我不太清楚，您再问问研究医生吧。"
+    },
+    {
+      "forbidden_id": "FB-ADM-03",
+      "category": "claim",
+      "description": "忽视受试者提到的头晕症状，未追问持续时间及是否联系研究团队。",
+      "remediating_reply": "这个我不太清楚，您再问问研究医生吧。"
+    },
+    {
+      "forbidden_id": "FB-ADM-04",
+      "category": "claim",
+      "description": "未检查日记填写完整性，未引导受试者补记漏服和头晕事件。",
+      "remediating_reply": "这个我不太清楚，您再问问研究医生吧。"
+    }
+  ],
+  "persona": {
+    "persona_id": "PER-ADM-8D00066C",
+    "display_name": "王秀英 · 随访（询问）",
+    "display_label": "王秀英 · 随访（询问） · 纺织厂女工（三班倒，近期白班）",
+    "age_years": 50,
+    "sex": "unknown",
+    "emotion_baseline": "anxious_mild",
+    "concealment_tendency": "moderate",
+    "occupation": "纺织厂女工（三班倒，近期白班）",
+    "lay_bio": "过去7天实际服药5天，漏服2次：第2天出门上班太急忘带药；第5天去女儿家过夜忘记带药。；第3天下午出现过一次头晕，持续约10分钟，自行休息后缓解；头晕后未联系研究团队，也未在日记中记录。；受试者担心被批评'不配合'，担心漏服导致被退出试验，不敢主动说漏服。"
+  },
+  "key_concerns": [
+    {
+      "concern_id": "KC-ADM-01",
+      "topic": "medication_adherence",
+      "patient_may_ask": [],
+      "researcher_should_cover": "核心训练目标之一，评估研究者追问依从性的技巧。",
+      "disclosure_rule": "受试者漏服2次但未主动告知，需用温和追问技巧获取真实服药情况。",
+      "source": "输入·一、训练目标 + 四、隐瞒与恐惧",
+      "reason": "核心训练目标之一，评估研究者追问依从性的技巧。"
+    },
+    {
+      "concern_id": "KC-ADM-02",
+      "topic": "psychological_concern",
+      "patient_may_ask": [],
+      "researcher_should_cover": "核心训练目标之二，评估研究者人文沟通能力。",
+      "disclosure_rule": "受试者对漏服存在恐惧心理，担心被退出试验，需给予共情与安抚。",
+      "source": "输入·一、训练目标 + 四、隐瞒与恐惧",
+      "reason": "核心训练目标之二，评估研究者人文沟通能力。"
+    },
+    {
+      "concern_id": "KC-ADM-03",
+      "topic": "adverse_event",
+      "patient_may_ask": [],
+      "researcher_should_cover": "安全性随访要点，评估研究者对不良事件的关注与引导。",
+      "disclosure_rule": "受试者出现头晕但未报告，需追问不适情况并引导其主动联系研究团队。",
+      "source": "输入·四、不适情况",
+      "reason": "安全性随访要点，评估研究者对不良事件的关注与引导。"
+    },
+    {
+      "concern_id": "KC-ADM-04",
+      "topic": "diary_compliance",
+      "patient_may_ask": [],
+      "researcher_should_cover": "随访质量核查要点，评估研究者对数据完整性的重视。",
+      "disclosure_rule": "日记未记录漏服及头晕事件，需检查日记完整性并指导补记。",
+      "source": "输入·二、本次目标 + 四、不适情况",
+      "reason": "随访质量核查要点，评估研究者对数据完整性的重视。"
+    },
+    {
+      "concern_id": "KC-ADM-05",
+      "topic": "担心被研究医生批评\"不配合\"",
+      "patient_may_ask": [],
+      "researcher_should_cover": "老师意见较笼统（内容少了），已对照案例文稿补具体内容，请再核对",
+      "disclosure_rule": "担心被研究医生批评\"不配合\"",
+      "source": "案例文稿",
+      "reason": "老师意见较笼统（内容少了），已对照案例文稿补具体内容，请再核对"
+    },
+    {
+      "concern_id": "KC-ADM-06",
+      "topic": "不敢主动说漏服，怕影响自己在医生心中的印象",
+      "patient_may_ask": [],
+      "researcher_should_cover": "老师意见较笼统（内容少了），已对照案例文稿补具体内容，请再核对",
+      "disclosure_rule": "不敢主动说漏服，怕影响自己在医生心中的印象",
+      "source": "案例文稿",
+      "reason": "老师意见较笼统（内容少了），已对照案例文稿补具体内容，请再核对"
+    }
+  ],
+  "dialogue_hints": {
+    "probing_strategy": "受试者说'基本都吃了'时，不立即拆穿，追问'能具体说说上周哪天忘了吗'；说'就忘了一次'且语气含糊时，用'有时候忙起来确实容易忘'共情后继续追问。",
+    "source": "输入·五、什么时候说什么",
+    "reason": "提供具体追问话术，指导研究者如何层层深入获取真实信息。"
+  },
+  "ingest_meta": {
+    "draft_id": "DRAFT-CCA21A19-A",
+    "mode": "rough",
+    "scoring_hints": [
+      {
+        "text": "是否使用温和、非指责性语言追问漏服情况；是否在受试者含糊回答时继续耐心追问细节。",
+        "source": "输入·一、训练目标 + 五、情境表",
+        "reason": "评估沟通方式与人文关怀（G-01）及用药依从核查技巧（G-02）。",
+        "confidence": "certain",
+        "source_span": "一、训练目标; 五、情境表",
+        "topic": "gentle_probing",
+        "rubric_group_id": "G-01",
+        "rubric_group_name": null,
+        "researcher_should_cover": null,
+        "disclosure_rule": null,
+        "patient_may_ask": null
+      },
+      {
+        "text": "是否在受试者承认漏服后给予安抚，明确告知'漏服一两次不影响继续参加'。",
+        "source": "输入·五、情境表",
+        "reason": "评估共情回应能力及对受试者恐惧的消除，属G-01人文沟通范畴。",
+        "confidence": "certain",
+        "source_span": "五、情境表",
+        "topic": "reassurance",
+        "rubric_group_id": "G-01",
+        "rubric_group_name": null,
+        "researcher_should_cover": null,
+        "disclosure_rule": null,
+        "patient_may_ask": null
+      },
+      {
+        "text": "是否通过药盒剩余量与自述的对比发现不一致，并据此追问。",
+        "source": "输入·二、桌上物品 + 四、服药情况",
+        "reason": "评估依从性核查的主动性与客观依据利用能力，属G-02用药核查范畴。",
+        "confidence": "certain",
+        "source_span": "二、桌上物品; 四、服药情况",
+        "topic": "objective_verification",
+        "rubric_group_id": "G-02",
+        "rubric_group_name": null,
+        "researcher_should_cover": null,
+        "disclosure_rule": null,
+        "patient_may_ask": null
+      },
+      {
+        "text": "是否追问头晕的持续时间、处理方式及是否联系研究团队。",
+        "source": "输入·四、不适情况 + 五、情境表",
+        "reason": "评估不良事件随访的完整性，属G-03随访安全范畴。",
+        "confidence": "certain",
+        "source_span": "四、不适情况; 五、情境表",
+        "topic": "ae_follow_up",
+        "rubric_group_id": "G-03",
+        "rubric_group_name": null,
+        "researcher_should_cover": null,
+        "disclosure_rule": null,
+        "patient_may_ask": null
+      },
+      {
+        "text": "是否检查日记完整性并引导补记漏服和头晕事件。",
+        "source": "输入·二、本次目标 + 四、服药情况",
+        "reason": "评估随访质量把控能力，属G-03随访安排范畴。",
+        "confidence": "certain",
+        "source_span": "二、本次目标; 四、服药情况",
+        "topic": "diary_review",
+        "rubric_group_id": "G-03",
+        "rubric_group_name": null,
+        "researcher_should_cover": null,
+        "disclosure_rule": null,
+        "patient_may_ask": null
+      },
+      {
+        "text": "是否避免使用可能让受试者感到被批评或威胁退出试验的语言。",
+        "source": "输入·四、隐瞒与恐惧",
+        "reason": "红线项，任何暗示退出威胁或指责性语言均扣分。",
+        "confidence": "certain",
+        "source_span": "四、隐瞒与恐惧",
+        "topic": "no_coercion",
+        "rubric_group_id": "G-R",
+        "rubric_group_name": null,
+        "researcher_should_cover": null,
+        "disclosure_rule": null,
+        "patient_may_ask": null
+      }
+    ],
+    "locked_facts_annotated": [
+      {
+        "text": "过去7天实际服药5天，漏服2次：第2天出门上班太急忘带药；第5天去女儿家过夜忘记带药。",
+        "source": "输入·四、受试者真实情况",
+        "reason": "扮演者需掌握的客观事实，用于评估研究者追问效果。",
+        "confidence": "certain",
+        "source_span": "四、服药情况",
+        "topic": "medication_adherence",
+        "rubric_group_id": null,
+        "rubric_group_name": null,
+        "researcher_should_cover": null,
+        "disclosure_rule": null,
+        "patient_may_ask": null
+      },
+      {
+        "text": "第3天下午出现过一次头晕，持续约10分钟，自行休息后缓解；头晕后未联系研究团队，也未在日记中记录。",
+        "source": "输入·四、受试者真实情况",
+        "reason": "不良事件信息，用于评估研究者对不适症状的追问与共情回应。",
+        "confidence": "certain",
+        "source_span": "四、不适情况",
+        "topic": "adverse_event",
+        "rubric_group_id": null,
+        "rubric_group_name": null,
+        "researcher_should_cover": null,
+        "disclosure_rule": null,
+        "patient_may_ask": null
+      },
+      {
+        "text": "受试者担心被批评'不配合'，担心漏服导致被退出试验，不敢主动说漏服。",
+        "source": "输入·四、隐瞒与恐惧",
+        "reason": "受试者心理状态，决定其回答策略，影响研究者共情回应的必要性。",
+        "confidence": "certain",
+        "source_span": "四、隐瞒与恐惧",
+        "topic": "psychological_concern",
+        "rubric_group_id": null,
+        "rubric_group_name": null,
+        "researcher_should_cover": null,
+        "disclosure_rule": null,
+        "patient_may_ask": null
+      },
+      {
+        "text": "药盒剩余约85%，日记中未记录漏服。",
+        "source": "输入·二、桌上物品 + 四、服药情况",
+        "reason": "客观证据与受试者自述存在矛盾，是触发深入追问的关键线索。",
+        "confidence": "certain",
+        "source_span": "二、桌上物品; 四、服药情况",
+        "topic": "adherence_discrepancy",
+        "rubric_group_id": null,
+        "rubric_group_name": null,
+        "researcher_should_cover": null,
+        "disclosure_rule": null,
+        "patient_may_ask": null
+      },
+      {
+        "text": "日常服用钙片每日1片，与研究药物无已知相互作用。",
+        "source": "输入·四、合并用药",
+        "reason": "排除药物相互作用干扰，聚焦依从性问题本身。",
+        "confidence": "certain",
+        "source_span": "四、合并用药",
+        "topic": "concomitant_medication",
+        "rubric_group_id": null,
+        "rubric_group_name": null,
+        "researcher_should_cover": null,
+        "disclosure_rule": null,
+        "patient_may_ask": null
+      }
+    ],
+    "openings_annotated": [
+      {
+        "text": "先测量血压，建立舒适氛围后再切入服药询问。",
+        "source": "输入·示例对话",
+        "reason": "符合内向、怕麻烦人受试者的沟通节奏，避免一上来就追问引发防御。",
+        "confidence": "certain",
+        "source_span": "示例对话",
+        "topic": "communication_pacing",
+        "rubric_group_id": null,
+        "rubric_group_name": null,
+        "researcher_should_cover": null,
+        "disclosure_rule": null,
+        "patient_may_ask": null
+      },
+      {
+        "text": "用'基本都吃了'之后的追问打开话题：'能具体说说上周哪天忘了吗？'",
+        "source": "输入·示例对话 + 五、什么时候说什么",
+        "reason": "受试者使用模糊表述时，研究者需温和而具体地追问细节。",
+        "confidence": "certain",
+        "source_span": "示例对话; 五、情境表",
+        "topic": "probing_technique",
+        "rubric_group_id": null,
+        "rubric_group_name": null,
+        "researcher_should_cover": null,
+        "disclosure_rule": null,
+        "patient_may_ask": null
+      },
+      {
+        "text": "发现药盒剩余85%与'基本都吃了'存在矛盾时，以客观观察切入而非直接质疑。",
+        "source": "输入·二、桌上物品 + 五、什么时候说什么",
+        "reason": "避免对抗性语气，用事实引导受试者主动承认。",
+        "confidence": "certain",
+        "source_span": "二、桌上物品; 五、情境表",
+        "topic": "evidence_based_inquiry",
+        "rubric_group_id": null,
+        "rubric_group_name": null,
+        "researcher_should_cover": null,
+        "disclosure_rule": null,
+        "patient_may_ask": null
+      },
+      {
+        "text": "50 岁",
+        "source": "案例文稿",
+        "reason": "老师意见较笼统（内容少了），已对照案例文稿补具体内容，请再核对",
+        "confidence": "guess",
+        "source_span": "50 岁"
+      },
+      {
+        "text": "纺织厂女工（三班倒，近期白班）",
+        "source": "案例文稿",
+        "reason": "老师反馈待核对：这个写得有点问题，改一下",
+        "confidence": "guess",
+        "source_span": "纺织厂女工（三班倒，近期白班）"
+      },
+      {
+        "text": "已婚，有一女（32 岁，住同城）；丈夫退休在家",
+        "source": "案例文稿",
+        "reason": "老师意见较笼统（内容少了），已对照案例文稿补具体内容，请再核对",
+        "confidence": "guess",
+        "source_span": "已婚，有一女（32 岁，住同城）；丈夫退休在家"
+      },
+      {
+        "text": "内向、怕麻烦人、对医生有敬畏感，不善表达",
+        "source": "案例文稿",
+        "reason": "老师意见较笼统（内容少了），已对照案例文稿补具体内容，请再核对",
+        "confidence": "guess",
+        "source_span": "内向、怕麻烦人、对医生有敬畏感，不善表达"
+      }
+    ]
+  }
+}

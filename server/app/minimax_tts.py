@@ -7,6 +7,8 @@ from typing import Any
 
 import httpx
 
+from .tts_prosody import inject_speech_pauses
+
 
 class MiniMaxTTS:
     def __init__(self, settings):
@@ -24,16 +26,44 @@ class MiniMaxTTS:
             return "(未配置)"
         return f"{key[:7]}…{key[-4:]}"
 
-    def synthesize(self, text: str, *, emotion: str | None = None) -> dict[str, Any]:
+    def synthesize(
+        self,
+        text: str,
+        *,
+        emotion: str | None = None,
+        speed: float | None = None,
+        vol: float | None = None,
+        pitch: int | None = None,
+        prosody: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         text = (text or "").strip()
         if not text:
             return {"ok": False, "error": "文本为空"}
         if not self.configured:
             return {"ok": False, "error": "MINIMAX_API_KEY 未配置"}
 
-        # 控制延迟：短句 + turbo
-        if len(text) > 500:
-            text = text[:500]
+        # 韵律：句间停顿 + 可选气声前缀
+        if prosody:
+            text = inject_speech_pauses(text, prosody)
+            emotion = emotion or prosody.get("emotion")
+            if speed is None and prosody.get("speed") is not None:
+                speed = float(prosody["speed"])
+            if vol is None and prosody.get("vol") is not None:
+                vol = float(prosody["vol"])
+            if pitch is None and prosody.get("pitch") is not None:
+                pitch = int(prosody["pitch"])
+
+        # 控制延迟：短句 + turbo（停顿标记不计入可读长度预算过多）
+        if len(text) > 700:
+            text = text[:700]
+
+        use_speed = float(self.settings.minimax_voice_speed if speed is None else speed)
+        use_speed = max(0.5, min(2.0, use_speed))
+        use_vol = 1.0 if vol is None else float(vol)
+        use_vol = max(0.1, min(10.0, use_vol))
+        use_pitch = 0 if pitch is None else int(pitch)
+        use_pitch = max(-12, min(12, use_pitch))
+        use_emotion = emotion or self.settings.minimax_voice_emotion
 
         url = f"{self.settings.minimax_base_url.rstrip('/')}/t2a_v2"
         payload = {
@@ -42,10 +72,10 @@ class MiniMaxTTS:
             "stream": False,
             "voice_setting": {
                 "voice_id": self.settings.minimax_voice_id,
-                "speed": self.settings.minimax_voice_speed,
-                "vol": 1,
-                "pitch": 0,
-                "emotion": emotion or self.settings.minimax_voice_emotion,
+                "speed": use_speed,
+                "vol": use_vol,
+                "pitch": use_pitch,
+                "emotion": use_emotion,
             },
             "audio_setting": {
                 "sample_rate": 32000,
@@ -104,4 +134,11 @@ class MiniMaxTTS:
             "trace_id": data.get("trace_id"),
             "model": self.settings.minimax_tts_model,
             "voice_id": self.settings.minimax_voice_id,
+            "prosody": {
+                "speed": use_speed,
+                "vol": use_vol,
+                "pitch": use_pitch,
+                "emotion": use_emotion,
+                "text_with_pauses": text,
+            },
         }

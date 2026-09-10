@@ -1,0 +1,56 @@
+{
+  "version": "3.0",
+  "note": "场景×病种评分注册表。引擎经 load_effective_rubric 读取；无 overlay 时等同旧版按场景整表。",
+  "scenes": {
+    "informed_consent": {
+      "label": "知情同意",
+      "rubric": "scoring-rubric.json",
+      "status": "production",
+      "clonedFrom": null
+    },
+    "follow_up": {
+      "label": "随访（询问）",
+      "rubric": "scoring-rubric-followup.json",
+      "status": "production",
+      "clonedFrom": null
+    },
+    "adherence": {
+      "label": "依从性（映射随访表）",
+      "rubric": "scoring-rubric-followup.json",
+      "status": "production",
+      "clonedFrom": "follow_up",
+      "aliasOf": "follow_up"
+    }
+  },
+  "overlays": {
+    "follow_up|HTN": {
+      "path": "scoring/overlays/follow_up__HTN.json",
+      "status": "production"
+    },
+    "follow_up|T2DM": {
+      "path": "scoring/overlays/follow_up__T2DM.json",
+      "status": "production"
+    },
+    "informed_consent|T2DM": {
+      "path": "scoring/overlays/informed_consent__T2DM.json",
+      "status": "production"
+    },
+    "informed_consent|HTN": {
+      "path": "scoring/overlays/informed_consent__HTN.json",
+      "status": "production"
+    }
+  },
+  "rules": {
+    "missingOverlay": "use_scene_rubric_and_flag_warning",
+    "publishRequiresRubric": true,
+    "newSceneRequiresClone": true,
+    "foundation": {
+      "verdictPoints": { "pass": 1.0, "uncertain": 0.5, "fail": 0.0 },
+      "defaultPassScore": 60,
+      "minTraineeTurns": 3,
+      "minTraineeChars": 120,
+      "primaryFeedback": "checklist",
+      "scoreRole": "teaching_reference"
+    }
+  }
+}

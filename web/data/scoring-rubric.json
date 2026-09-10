@@ -1,55 +1,609 @@
 {
   "meta": {
-    "version": "1.1.0-mvp",
+    "version": "1.1.0-mvp+groups",
     "scene": "informed_consent",
     "sceneLabel": "S1 知情同意沟通",
-    "passRule": "L1 全部通过且无 IC-X 违规项；练习参考分≥60",
+    "passRule": "L1 全部通过且无 IC-X 违规项；练习参考分≥60；反馈以清单达标为主，参考分为教学汇总（非问卷赋分）",
     "rubricFile": "scoring-rubric.json",
     "scoringModel": {
       "version": "1.1",
       "totalScale": 100,
       "passScore": 60,
       "dimensions": [
-        { "id": "redline", "name": "红线（一票否决）", "weight": 0, "isGate": true },
-        { "id": "L1", "name": "必达内容", "weight": 0.50 },
-        { "id": "L2", "name": "过程合规", "weight": 0.20 },
-        { "id": "concern", "name": "关切回应", "weight": 0.30 }
+        {
+          "id": "redline",
+          "name": "红线（一票否决）",
+          "weight": 0,
+          "isGate": true
+        },
+        {
+          "id": "L1",
+          "name": "必达内容",
+          "weight": 0.5
+        },
+        {
+          "id": "L2",
+          "name": "过程合规",
+          "weight": 0.2
+        },
+        {
+          "id": "concern",
+          "name": "关切回应",
+          "weight": 0.3
+        }
       ],
-      "verdictPoints": { "pass": 1.0, "uncertain": 0.5, "fail": 0.0 }
+      "verdictPoints": {
+        "pass": 1.0,
+        "uncertain": 0.5,
+        "fail": 0.0
+      }
+    },
+    "displayModel": {
+      "version": "1.0",
+      "note": "大类分=该组小项达成率×displayMax，仅展示；总分仍按 scoringModel 维度加权",
+      "primaryFeedback": "checklist",
+      "scoreRole": "teaching_reference"
     }
   },
   "layers": [
-    { "id": "L1", "name": "硬性必达 / 禁止", "color": "#dc2626" },
-    { "id": "L2", "name": "过程合规", "color": "#2563eb" },
-    { "id": "L3", "name": "沟通质量", "color": "#64748b" }
+    {
+      "id": "L1",
+      "name": "硬性必达 / 禁止",
+      "color": "#dc2626"
+    },
+    {
+      "id": "L2",
+      "name": "过程合规",
+      "color": "#2563eb"
+    },
+    {
+      "id": "L3",
+      "name": "沟通质量",
+      "color": "#64748b"
+    }
   ],
   "items": [
-    { "id": "IC-P01", "type": "process", "layer": "L1", "title": "使用伦理批准 ICF 版本", "pass": "说明使用的是伦理委员会批准的最新版 ICF", "fail": "版本不明、与书面材料不一致", "sources": ["gcp-2020:第二十三条（一）", "gcp-2026:第二十七条（一）"], "enabledMvp": true, "hardFail": false },
-    { "id": "IC-P02", "type": "process", "layer": "L1", "title": "充分告知试验事宜", "pass": "覆盖目的、流程、权利义务", "fail": "只让签字不解释", "sources": ["gcp-2020:第二十三条（四）", "gcp-2026:第二十七条（一）"], "enabledMvp": true, "hardFail": false },
-    { "id": "IC-P03", "type": "process", "layer": "L1", "title": "通俗易懂", "pass": "少术语或解释术语，层次清晰", "fail": "大段照念、受试者无法理解", "sources": ["gcp-2020:第二十三条（五）", "ethics-2023:第三十五条"], "enabledMvp": true, "hardFail": false },
-    { "id": "IC-P04", "type": "process", "layer": "L1", "title": "充分时间与答疑", "pass": "邀请提问并详尽回答", "fail": "催促签字、限制提问", "sources": ["gcp-2020:第二十三条（六）", "ethics-2023:第三十七条"], "enabledMvp": true, "hardFail": false },
-    { "id": "IC-P05", "type": "process", "layer": "L1", "title": "自愿、禁止强迫利诱", "pass": "明确可拒绝、可随时退出", "fail": "「不签没药」「必须参加」", "sources": ["gcp-2020:第二十三条（三）", "ethics-2016:第十八条", "helsinki-2024"], "enabledMvp": true, "hardFail": false },
-    { "id": "IC-P06", "type": "process", "layer": "L1", "title": "新信息及时告知", "pass": "说明后续如有新信息会再告知", "fail": "声称以后不用知道", "sources": ["gcp-2020:第二十三条（二）", "gcp-2026:第二十七条（二）"], "enabledMvp": true, "hardFail": false },
-    { "id": "IC-C01", "type": "content", "layer": "L1", "title": "说明试验目的", "pass": "说明为何开展、解决什么问题", "fail": "完全未提目的", "sources": ["gcp-2020:第二十四条（二）", "ethics-2023:第三十六条（一）"], "enabledMvp": true, "hardFail": false },
-    { "id": "IC-C04", "type": "content", "layer": "L1", "title": "说明风险与不便", "pass": "提及主要风险或不适", "fail": "只说「很安全」", "sources": ["gcp-2020:第二十四条（七）", "ich-e6-r3:Principle 1.3"], "enabledMvp": true, "hardFail": false },
-    { "id": "IC-C05", "type": "content", "layer": "L1", "title": "获益与不确定", "pass": "说明可能获益及可能无法获益", "fail": "「一定有效」「包治」", "sources": ["gcp-2020:第二十四条（八）"], "enabledMvp": true, "hardFail": false },
-    { "id": "IC-C07", "type": "content", "layer": "L1", "title": "损害补偿与治疗", "pass": "说明相关损害的处理原则", "fail": "「出问题没人管」", "sources": ["gcp-2020:第二十四条（十）", "ethics-2023:第三十六条（六）"], "enabledMvp": true, "hardFail": false },
-    { "id": "IC-C09", "type": "content", "layer": "L1", "title": "自愿与退出权", "pass": "可随时退出且不受歧视", "fail": "暗示退出影响治疗", "sources": ["gcp-2020:第二十四条（十三）", "ethics-2023:第三十六条（六）"], "enabledMvp": true, "hardFail": false },
-    { "id": "IC-C12", "type": "content", "layer": "L1", "title": "新信息告知机制", "pass": "有新发现会再告知", "fail": null, "sources": ["gcp-2020:第二十四条（十六）"], "enabledMvp": true, "hardFail": false },
-    { "id": "IC-X01", "type": "prohibition", "layer": "L1", "title": "禁止强迫利诱", "pass": "无胁迫利诱表述", "fail": "任何强迫、利诱", "sources": ["gcp-2020:第二十三条（三）"], "enabledMvp": true, "hardFail": true },
-    { "id": "IC-X02", "type": "prohibition", "layer": "L1", "title": "禁止过度承诺", "pass": "无保证疗效/绝对安全", "fail": "「肯定治好」「没有副作用」", "sources": ["IC-C05", "helsinki-2024"], "enabledMvp": true, "hardFail": true },
-    { "id": "IC-X03", "type": "prohibition", "layer": "L1", "title": "禁止隐瞒重大风险", "pass": "不回避已知重要风险", "fail": "故意不提严重 AE 风险", "sources": ["IC-C04", "helsinki-2024"], "enabledMvp": true, "hardFail": true },
-    { "id": "IC-X04", "type": "prohibition", "layer": "L1", "title": "禁止报复性暗示", "pass": "不暗示不签影响待遇", "fail": "「不签就不给你看」", "sources": ["IC-C09"], "enabledMvp": true, "hardFail": true },
-    { "id": "IC-X05", "type": "prohibition", "layer": "L1", "title": "禁止不当免责表述", "pass": "不要求放弃合法权益", "fail": "「出了事你自负」", "sources": ["gcp-2020:第十二条（七）"], "enabledMvp": true, "hardFail": true },
-    { "id": "IC-X06", "type": "prohibition", "layer": "L1", "title": "禁止非批准 ICF", "pass": null, "fail": "使用未经伦理批准材料", "sources": ["IC-P01"], "enabledMvp": true, "hardFail": true },
-    { "id": "IC-C02", "type": "content", "layer": "L2", "title": "试验步骤与安排", "pass": "说明流程、访视安排", "fail": null, "sources": ["gcp-2020:第二十四条（四）"], "enabledMvp": true, "hardFail": false },
-    { "id": "IC-C06", "type": "content", "layer": "L2", "title": "其他治疗选择", "pass": "提及其他可选治疗", "fail": null, "sources": ["gcp-2020:第二十四条（九）"], "enabledMvp": true, "hardFail": false },
-    { "id": "IC-C08", "type": "content", "layer": "L2", "title": "补偿与花费", "pass": "说明补偿与自费", "fail": null, "sources": ["gcp-2020:第二十四条（十一）（十二）"], "enabledMvp": true, "hardFail": false },
-    { "id": "IC-C10", "type": "content", "layer": "L2", "title": "记录查阅说明", "pass": "简要说明监查/稽查/监管查阅", "fail": null, "sources": ["gcp-2020:第二十四条（十四）"], "enabledMvp": true, "hardFail": false },
-    { "id": "IC-C13", "type": "content", "layer": "L2", "title": "联系方式", "pass": "提供疑问联系人或伦理联系方式", "fail": null, "sources": ["gcp-2020:第二十四条（十七）"], "enabledMvp": true, "hardFail": false },
-    { "id": "IC-P10", "type": "process", "layer": "L2", "title": "提供 ICF 副本", "pass": "说明可获得签署文件副本", "fail": null, "sources": ["gcp-2020:第二十三条（九）"], "enabledMvp": true, "hardFail": false, "dimension": "L2" },
-    { "id": "CC-01", "type": "concern", "layer": "L1", "dimension": "concern", "title": "回应退出权关切", "pass": "明确可随时退出、不影响正常治疗", "fail": "未回应或回避退出权", "sources": ["IC-C09"], "enabledMvp": true, "hardFail": false, "weight": 1.2 },
-    { "id": "CC-02", "type": "concern", "layer": "L1", "dimension": "concern", "title": "回应疗效/安慰剂关切", "pass": "说明可能无效、可能分到对照/安慰剂", "fail": "未回应是否一定有效", "sources": ["IC-C05"], "enabledMvp": true, "hardFail": false, "weight": 1.2 },
-    { "id": "CC-03", "type": "concern", "layer": "L1", "dimension": "concern", "title": "回应副作用/风险关切", "pass": "具体说明可能不适/风险，非「很安全」", "fail": "未回应副作用或淡化风险", "sources": ["IC-C04"], "enabledMvp": true, "hardFail": false, "weight": 1.1 }
+    {
+      "id": "IC-P01",
+      "type": "process",
+      "layer": "L1",
+      "title": "使用伦理批准 ICF 版本",
+      "pass": "说明使用的是伦理委员会批准的最新版 ICF",
+      "fail": "版本不明、与书面材料不一致",
+      "sources": [
+        "gcp-2020:第二十三条（一）",
+        "gcp-2026:第二十七条（一）"
+      ],
+      "enabledMvp": true,
+      "hardFail": false,
+      "group_id": "G-02",
+      "trainee_role": "explain",
+      "prompt_examples": [
+        "这份是伦理委员会批准的最新版知情同意书"
+      ]
+    },
+    {
+      "id": "IC-P02",
+      "type": "process",
+      "layer": "L1",
+      "title": "充分告知试验事宜",
+      "pass": "覆盖目的、流程、权利义务",
+      "fail": "只让签字不解释",
+      "sources": [
+        "gcp-2020:第二十三条（四）",
+        "gcp-2026:第二十七条（一）"
+      ],
+      "enabledMvp": true,
+      "hardFail": false,
+      "group_id": "G-02",
+      "trainee_role": "explain",
+      "prompt_examples": [
+        "我先把试验目的、怎么做、您的权利义务讲清楚"
+      ]
+    },
+    {
+      "id": "IC-P03",
+      "type": "process",
+      "layer": "L1",
+      "title": "通俗易懂",
+      "pass": "少术语或解释术语，层次清晰",
+      "fail": "大段照念、受试者无法理解",
+      "sources": [
+        "gcp-2020:第二十三条（五）",
+        "ethics-2023:第三十五条"
+      ],
+      "enabledMvp": true,
+      "hardFail": false,
+      "group_id": "G-01",
+      "trainee_role": "explain",
+      "prompt_examples": [
+        "用大白话讲一遍试验是干什么的",
+        "有听不懂的随时打断我"
+      ]
+    },
+    {
+      "id": "IC-P04",
+      "type": "process",
+      "layer": "L1",
+      "title": "充分时间与答疑",
+      "pass": "邀请提问并详尽回答",
+      "fail": "催促签字、限制提问",
+      "sources": [
+        "gcp-2020:第二十三条（六）",
+        "ethics-2023:第三十七条"
+      ],
+      "enabledMvp": true,
+      "hardFail": false,
+      "group_id": "G-01",
+      "trainee_role": "explain",
+      "prompt_examples": [
+        "不着急签字，有问题尽管问",
+        "我把关键点讲完，您慢慢考虑"
+      ]
+    },
+    {
+      "id": "IC-P05",
+      "type": "process",
+      "layer": "L1",
+      "title": "自愿、禁止强迫利诱",
+      "pass": "明确可拒绝、可随时退出",
+      "fail": "「不签没药」「必须参加」",
+      "sources": [
+        "gcp-2020:第二十三条（三）",
+        "ethics-2016:第十八条",
+        "helsinki-2024"
+      ],
+      "enabledMvp": true,
+      "hardFail": false,
+      "group_id": "G-01",
+      "trainee_role": "explain",
+      "prompt_examples": [
+        "参加完全自愿，不愿意也可以不参加",
+        "中途想退出随时可以，不影响正常治疗"
+      ]
+    },
+    {
+      "id": "IC-P06",
+      "type": "process",
+      "layer": "L1",
+      "title": "新信息及时告知",
+      "pass": "说明后续如有新信息会再告知",
+      "fail": "声称以后不用知道",
+      "sources": [
+        "gcp-2020:第二十三条（二）",
+        "gcp-2026:第二十七条（二）"
+      ],
+      "enabledMvp": true,
+      "hardFail": false,
+      "group_id": "G-04",
+      "trainee_role": "explain",
+      "prompt_examples": [
+        "有新发现或方案变化，我们会及时告诉您"
+      ]
+    },
+    {
+      "id": "IC-C01",
+      "type": "content",
+      "layer": "L1",
+      "title": "说明试验目的",
+      "pass": "说明为何开展、解决什么问题",
+      "fail": "完全未提目的",
+      "sources": [
+        "gcp-2020:第二十四条（二）",
+        "ethics-2023:第三十六条（一）"
+      ],
+      "enabledMvp": true,
+      "hardFail": false,
+      "group_id": "G-02",
+      "trainee_role": "explain",
+      "prompt_examples": [
+        "这次试验主要是想了解这个药对血糖/血压有没有帮助"
+      ]
+    },
+    {
+      "id": "IC-C04",
+      "type": "content",
+      "layer": "L1",
+      "title": "说明风险与不便",
+      "pass": "提及主要风险或不适",
+      "fail": "只说「很安全」",
+      "sources": [
+        "gcp-2020:第二十四条（七）",
+        "ich-e6-r3:Principle 1.3"
+      ],
+      "enabledMvp": true,
+      "hardFail": false,
+      "group_id": "G-02",
+      "trainee_role": "explain",
+      "prompt_examples": [
+        "可能出现哪些不适或风险，我具体说一下"
+      ]
+    },
+    {
+      "id": "IC-C05",
+      "type": "content",
+      "layer": "L1",
+      "title": "获益与不确定",
+      "pass": "说明可能获益及可能无法获益",
+      "fail": "「一定有效」「包治」",
+      "sources": [
+        "gcp-2020:第二十四条（八）"
+      ],
+      "enabledMvp": true,
+      "hardFail": false,
+      "group_id": "G-02",
+      "trainee_role": "explain",
+      "prompt_examples": [
+        "不一定人人都有效，也可能分到对照/安慰剂"
+      ]
+    },
+    {
+      "id": "IC-C07",
+      "type": "content",
+      "layer": "L1",
+      "title": "损害补偿与治疗",
+      "pass": "说明相关损害的处理原则",
+      "fail": "「出问题没人管」",
+      "sources": [
+        "gcp-2020:第二十四条（十）",
+        "ethics-2023:第三十六条（六）"
+      ],
+      "enabledMvp": true,
+      "hardFail": false,
+      "group_id": "G-04",
+      "trainee_role": "explain",
+      "prompt_examples": [
+        "如果因试验受伤，会按方案原则处理治疗与补偿"
+      ]
+    },
+    {
+      "id": "IC-C09",
+      "type": "content",
+      "layer": "L1",
+      "title": "自愿与退出权",
+      "pass": "可随时退出且不受歧视",
+      "fail": "暗示退出影响治疗",
+      "sources": [
+        "gcp-2020:第二十四条（十三）",
+        "ethics-2023:第三十六条（六）"
+      ],
+      "enabledMvp": true,
+      "hardFail": false,
+      "group_id": "G-02",
+      "trainee_role": "explain",
+      "prompt_examples": [
+        "您可以随时退出，不会因此受歧视或影响常规治疗"
+      ]
+    },
+    {
+      "id": "IC-C12",
+      "type": "content",
+      "layer": "L1",
+      "title": "新信息告知机制",
+      "pass": "有新发现会再告知",
+      "fail": null,
+      "sources": [
+        "gcp-2020:第二十四条（十六）"
+      ],
+      "enabledMvp": true,
+      "hardFail": false,
+      "group_id": "G-04",
+      "trainee_role": "explain",
+      "prompt_examples": [
+        "以后有重要新信息，我们会再告知您"
+      ]
+    },
+    {
+      "id": "IC-X01",
+      "type": "prohibition",
+      "layer": "L1",
+      "title": "禁止强迫利诱",
+      "pass": "无胁迫利诱表述",
+      "fail": "任何强迫、利诱",
+      "sources": [
+        "gcp-2020:第二十三条（三）"
+      ],
+      "enabledMvp": true,
+      "hardFail": true,
+      "group_id": "G-R",
+      "trainee_role": "avoid",
+      "prompt_examples": [
+        "禁止：不签就不给看病/必须参加"
+      ]
+    },
+    {
+      "id": "IC-X02",
+      "type": "prohibition",
+      "layer": "L1",
+      "title": "禁止过度承诺",
+      "pass": "无保证疗效/绝对安全",
+      "fail": "「肯定治好」「没有副作用」",
+      "sources": [
+        "IC-C05",
+        "helsinki-2024"
+      ],
+      "enabledMvp": true,
+      "hardFail": true,
+      "group_id": "G-R",
+      "trainee_role": "avoid",
+      "prompt_examples": [
+        "禁止：肯定治好、绝对安全、没有副作用"
+      ]
+    },
+    {
+      "id": "IC-X03",
+      "type": "prohibition",
+      "layer": "L1",
+      "title": "禁止隐瞒重大风险",
+      "pass": "不回避已知重要风险",
+      "fail": "故意不提严重 AE 风险",
+      "sources": [
+        "IC-C04",
+        "helsinki-2024"
+      ],
+      "enabledMvp": true,
+      "hardFail": true,
+      "group_id": "G-R",
+      "trainee_role": "avoid",
+      "prompt_examples": [
+        "禁止：故意不提已知重要风险"
+      ]
+    },
+    {
+      "id": "IC-X04",
+      "type": "prohibition",
+      "layer": "L1",
+      "title": "禁止报复性暗示",
+      "pass": "不暗示不签影响待遇",
+      "fail": "「不签就不给你看」",
+      "sources": [
+        "IC-C09"
+      ],
+      "enabledMvp": true,
+      "hardFail": true,
+      "group_id": "G-R",
+      "trainee_role": "avoid",
+      "prompt_examples": [
+        "禁止：暗示不签会影响待遇"
+      ]
+    },
+    {
+      "id": "IC-X05",
+      "type": "prohibition",
+      "layer": "L1",
+      "title": "禁止不当免责表述",
+      "pass": "不要求放弃合法权益",
+      "fail": "「出了事你自负」",
+      "sources": [
+        "gcp-2020:第十二条（七）"
+      ],
+      "enabledMvp": true,
+      "hardFail": true,
+      "group_id": "G-R",
+      "trainee_role": "avoid",
+      "prompt_examples": [
+        "禁止：出了事自负、要求放弃权利"
+      ]
+    },
+    {
+      "id": "IC-X06",
+      "type": "prohibition",
+      "layer": "L1",
+      "title": "禁止非批准 ICF",
+      "pass": null,
+      "fail": "使用未经伦理批准材料",
+      "sources": [
+        "IC-P01"
+      ],
+      "enabledMvp": true,
+      "hardFail": true,
+      "group_id": "G-R",
+      "trainee_role": "avoid",
+      "prompt_examples": [
+        "禁止：使用未经伦理批准的材料"
+      ]
+    },
+    {
+      "id": "IC-C02",
+      "type": "content",
+      "layer": "L2",
+      "title": "试验步骤与安排",
+      "pass": "说明流程、访视安排",
+      "fail": null,
+      "sources": [
+        "gcp-2020:第二十四条（四）"
+      ],
+      "enabledMvp": true,
+      "hardFail": false,
+      "group_id": "G-04",
+      "trainee_role": "explain",
+      "prompt_examples": [
+        "大概要来医院几次、做什么检查、怎么服药"
+      ]
+    },
+    {
+      "id": "IC-C06",
+      "type": "content",
+      "layer": "L2",
+      "title": "其他治疗选择",
+      "pass": "提及其他可选治疗",
+      "fail": null,
+      "sources": [
+        "gcp-2020:第二十四条（九）"
+      ],
+      "enabledMvp": true,
+      "hardFail": false,
+      "group_id": "G-04",
+      "trainee_role": "explain",
+      "prompt_examples": [
+        "不参加也可以继续常规治疗，还有其他可选方案"
+      ]
+    },
+    {
+      "id": "IC-C08",
+      "type": "content",
+      "layer": "L2",
+      "title": "补偿与花费",
+      "pass": "说明补偿与自费",
+      "fail": null,
+      "sources": [
+        "gcp-2020:第二十四条（十一）（十二）"
+      ],
+      "enabledMvp": true,
+      "hardFail": false,
+      "group_id": "G-04",
+      "trainee_role": "explain",
+      "prompt_examples": [
+        "交通/误工补贴怎么算，哪些可能要自费"
+      ]
+    },
+    {
+      "id": "IC-C10",
+      "type": "content",
+      "layer": "L2",
+      "title": "记录查阅说明",
+      "pass": "简要说明监查/稽查/监管查阅",
+      "fail": null,
+      "sources": [
+        "gcp-2020:第二十四条（十四）"
+      ],
+      "enabledMvp": true,
+      "hardFail": false,
+      "group_id": "G-04",
+      "trainee_role": "explain",
+      "prompt_examples": [
+        "监查、稽查或药监可能查阅相关记录"
+      ]
+    },
+    {
+      "id": "IC-C13",
+      "type": "content",
+      "layer": "L2",
+      "title": "联系方式",
+      "pass": "提供疑问联系人或伦理联系方式",
+      "fail": null,
+      "sources": [
+        "gcp-2020:第二十四条（十七）"
+      ],
+      "enabledMvp": true,
+      "hardFail": false,
+      "group_id": "G-04",
+      "trainee_role": "explain",
+      "prompt_examples": [
+        "有疑问可以打这个电话，也可以联系伦理委员会"
+      ]
+    },
+    {
+      "id": "IC-P10",
+      "type": "process",
+      "layer": "L2",
+      "title": "提供 ICF 副本",
+      "pass": "说明可获得签署文件副本",
+      "fail": null,
+      "sources": [
+        "gcp-2020:第二十三条（九）"
+      ],
+      "enabledMvp": true,
+      "hardFail": false,
+      "dimension": "L2",
+      "group_id": "G-04",
+      "trainee_role": "explain",
+      "prompt_examples": [
+        "签完后会给您一份副本带走"
+      ]
+    },
+    {
+      "id": "CC-01",
+      "type": "concern",
+      "layer": "L1",
+      "dimension": "concern",
+      "title": "回应退出权关切",
+      "pass": "明确可随时退出、不影响正常治疗",
+      "fail": "未回应或回避退出权",
+      "sources": [
+        "IC-C09"
+      ],
+      "enabledMvp": true,
+      "hardFail": false,
+      "weight": 1.2,
+      "group_id": "G-03",
+      "trainee_role": "respond",
+      "prompt_examples": [
+        "您问退出权：可以，随时退出且不影响正常治疗"
+      ]
+    },
+    {
+      "id": "CC-02",
+      "type": "concern",
+      "layer": "L1",
+      "dimension": "concern",
+      "title": "回应疗效/安慰剂关切",
+      "pass": "说明可能无效、可能分到对照/安慰剂",
+      "fail": "未回应是否一定有效",
+      "sources": [
+        "IC-C05"
+      ],
+      "enabledMvp": true,
+      "hardFail": false,
+      "weight": 1.2,
+      "group_id": "G-03",
+      "trainee_role": "respond",
+      "prompt_examples": [
+        "您问是不是一定有效：不能保证，可能无效或分到对照"
+      ]
+    },
+    {
+      "id": "CC-03",
+      "type": "concern",
+      "layer": "L1",
+      "dimension": "concern",
+      "title": "回应副作用/风险关切",
+      "pass": "具体说明可能不适/风险，非「很安全」",
+      "fail": "未回应副作用或淡化风险",
+      "sources": [
+        "IC-C04"
+      ],
+      "enabledMvp": true,
+      "hardFail": false,
+      "weight": 1.1,
+      "group_id": "G-03",
+      "trainee_role": "respond",
+      "prompt_examples": [
+        "您担心副作用：可能有哪些不适，我们会监测并及时处理"
+      ]
+    }
+  ],
+  "groups": [
+    {
+      "id": "G-01",
+      "name": "人文关怀与沟通",
+      "displayMax": 20,
+      "order": 1
+    },
+    {
+      "id": "G-02",
+      "name": "试验内容与风险获益",
+      "displayMax": 25,
+      "order": 2
+    },
+    {
+      "id": "G-03",
+      "name": "回应受试者关切",
+      "displayMax": 20,
+      "order": 3
+    },
+    {
+      "id": "G-04",
+      "name": "流程权利与安排",
+      "displayMax": 20,
+      "order": 4
+    },
+    {
+      "id": "G-R",
+      "name": "红线",
+      "displayMax": null,
+      "isGate": true,
+      "order": 5
+    }
   ]
 }

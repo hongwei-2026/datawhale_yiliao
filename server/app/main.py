@@ -4,7 +4,11 @@ import json
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
+import mimetypes
+mimetypes.add_type("image/webp", ".webp")
+mimetypes.add_type("image/webp", ".WEBP")
+
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -22,6 +26,7 @@ from .auth import (
     require_user,
 )
 from . import admin_svc
+from . import case_ingest
 from .config import get_settings
 from .db import connect, get_meta, init_schema, migrate_schema, new_id, set_meta, table_counts, utc_now
 from .minimax_tts import MiniMaxTTS
@@ -210,14 +215,21 @@ def health():
 
 
 class TtsBody(BaseModel):
-    text: str = Field(min_length=1, max_length=800)
+    text: str = Field(min_length=1, max_length=2000)
 
 
 class PatientSpeakBody(BaseModel):
-    text: str = Field(min_length=1, max_length=800)
+    text: str = Field(min_length=1, max_length=2000)
     persona_id: str = Field(default="", max_length=64)
     prefer_talking_video: bool = True
     emotion: str = Field(default="", max_length=32)
+    # 韵律：语速 / 音量 / 音高 / 句间停顿（秒）
+    speed: float | None = Field(default=None, ge=0.5, le=2.0)
+    vol: float | None = Field(default=None, ge=0.1, le=10.0)
+    pitch: int | None = Field(default=None, ge=-12, le=12)
+    pause_sec: float | None = Field(default=None, ge=0.0, le=2.5)
+    comma_pause_sec: float | None = Field(default=None, ge=0.0, le=1.5)
+    stance: str = Field(default="", max_length=32)
 
 
 @app.get("/api/voice/status")
@@ -275,13 +287,54 @@ def api_voice_patient_speak(body: PatientSpeakBody):
     talking = TalkingHeadService(settings)
     musetalk = MuseTalkService(settings)
 
-    tts_result = tts.synthesize(body.text, emotion=body.emotion or None)
-    if not tts_result.get("ok") and body.emotion:
-        tts_result = tts.synthesize(body.text, emotion=None)
+    speak_text = (body.text or "").strip()
+    # 系统故障提示不走 TTS，避免无意义计费与 400
+    if speak_text.startswith("（系统）") or "暂时连不上模拟病人" in speak_text:
+        return {
+            "ok": False,
+            "soft": True,
+            "error": "系统提示不朗读",
+            "mode": "text_only",
+        }
+
+    from .tts_prosody import build_tts_prosody
+
+    prosody = build_tts_prosody(
+        body.stance or None,
+        tts_emotion=body.emotion or None,
+    )
+    if body.speed is not None:
+        prosody["speed"] = body.speed
+    if body.vol is not None:
+        prosody["vol"] = body.vol
+    if body.pitch is not None:
+        prosody["pitch"] = body.pitch
+    if body.pause_sec is not None:
+        prosody["pause_sec"] = body.pause_sec
+    if body.comma_pause_sec is not None:
+        prosody["comma_pause_sec"] = body.comma_pause_sec
+    if body.emotion:
+        prosody["emotion"] = body.emotion
+
+    tts_result = tts.synthesize(speak_text, prosody=prosody)
+    if not tts_result.get("ok") and (body.emotion or prosody.get("prefix_tag")):
+        # 情绪标签 / 气声前缀不被模型接受时，降级为纯韵律（停顿+语速音量）
+        soft_prosody = {**prosody, "emotion": None, "prefix_tag": ""}
+        tts_result = tts.synthesize(
+            speak_text,
+            emotion=None,
+            prosody=soft_prosody,
+        )
     if not tts_result.get("ok"):
         err = tts_result.get("error") or "语音合成失败"
-        # 余额不足等：软失败，前端可继续纯文字对话
-        if any(k in str(err).lower() for k in ("insufficient", "balance", "余额", "quota")):
+        err_l = str(err).lower()
+        # 余额不足 / 网络 / 密钥问题：软失败，前端可继续纯文字对话
+        soft_keys = (
+            "insufficient", "balance", "余额", "quota",
+            "未配置", "timeout", "timed out", "connect", "dns",
+            "getaddrinfo", "http 429", "http 5",
+        )
+        if any(k in err_l for k in soft_keys):
             return {
                 "ok": False,
                 "soft": True,
@@ -303,6 +356,7 @@ def api_voice_patient_speak(body: PatientSpeakBody):
         "mode": "audio_only",
         "model": tts_result.get("model"),
         "voice_id": tts_result.get("voice_id"),
+        "prosody": tts_result.get("prosody") or prosody,
     }
 
     if not body.prefer_talking_video:
@@ -310,7 +364,7 @@ def api_voice_patient_speak(body: PatientSpeakBody):
 
     # MuseTalk（GPU 本地，音画合一）优先
     if musetalk.enabled:
-        cached = musetalk.cached_video_url(body.persona_id, body.text, audio_bytes)
+        cached = musetalk.cached_video_url(body.persona_id, speak_text, audio_bytes)
         if cached:
             out.update({
                 "mode": "talking_video",
@@ -321,7 +375,7 @@ def api_voice_patient_speak(body: PatientSpeakBody):
             return out
         job_id = musetalk.start_job(
             persona_id=body.persona_id,
-            text=body.text,
+            text=speak_text,
             audio_bytes=audio_bytes,
         )
         out.update({
@@ -336,7 +390,7 @@ def api_voice_patient_speak(body: PatientSpeakBody):
     video_audio_bytes = audio_bytes
     video_audio_ms = audio_length_ms
     if talking.enabled and (not audio_length_ms or audio_length_ms < 2000):
-        padded = tts.synthesize(f"{body.text.rstrip()}……")
+        padded = tts.synthesize(f"{speak_text.rstrip()}……")
         if padded.get("ok"):
             video_audio_bytes = b64mod.b64decode(padded["audio_base64"])
             video_audio_ms = padded.get("audio_length_ms")
@@ -344,14 +398,14 @@ def api_voice_patient_speak(body: PatientSpeakBody):
     if not talking.enabled:
         return out
 
-    cached = talking.cached_video_url(body.persona_id, body.text, video_audio_bytes)
+    cached = talking.cached_video_url(body.persona_id, speak_text, video_audio_bytes)
     if cached:
         out.update({"mode": "talking_video", "video_url": cached, "cache_hit": True})
         return out
 
     job_id = talking.start_job(
         persona_id=body.persona_id,
-        text=body.text,
+        text=speak_text,
         audio_bytes=video_audio_bytes,
         audio_length_ms=video_audio_ms,
     )
@@ -806,6 +860,7 @@ def api_get_session(session_id: str, user: dict = Depends(require_user)):
         "messages": session_svc.get_messages(app.state.db_path, session_id),
         "feedback": session_svc.get_feedback(app.state.db_path, session_id),
         "patient_affect": session_svc.session_patient_affect(sess),
+        "emotion_log": session_svc.session_emotion_log(sess),
     }
 
 
@@ -876,6 +931,10 @@ class AdminSceneBody(BaseModel):
     description: str | None = None
     code: str | None = None
     enabled: bool = True
+    # test=测试登记；formal=正式（管理员开通，病例可选为正式场景）
+    tier: str | None = None
+    status: str | None = None
+    statusLabel: str | None = None
 
 
 class AdminAvatarBody(BaseModel):
@@ -883,6 +942,13 @@ class AdminAvatarBody(BaseModel):
     visual: str | None = None
     portrait_path: str | None = None
     model_id: str | None = None
+
+
+class AdminPortraitGenerateBody(BaseModel):
+    persona_id: str
+    prompt: str | None = None
+    display_hint: str | None = None
+    bind: bool = True
 
 
 @app.get("/api/admin/stats")
@@ -942,6 +1008,226 @@ def api_admin_import_case(body: dict, user: dict = Depends(require_admin)):
     if not result.get("ok"):
         raise HTTPException(400, result.get("error") or "导入失败")
     return result
+
+
+@app.get("/api/admin/cases/ingest/scenes")
+def api_admin_ingest_scenes(user: dict = Depends(require_admin)):
+    return {"ok": True, "scenes": case_ingest.list_whitelist_scenes()}
+
+
+@app.get("/api/admin/cases/ingest/diseases")
+def api_admin_ingest_diseases(user: dict = Depends(require_admin)):
+    return {"ok": True, "diseases": case_ingest.list_whitelist_diseases()}
+
+
+@app.post("/api/admin/cases/ingest/diseases")
+def api_admin_ingest_diseases_create(body: dict = Body(...), user: dict = Depends(require_admin)):
+    result = case_ingest.upsert_disease(body or {})
+    if not result.get("ok"):
+        raise HTTPException(400, result.get("error") or "保存病种失败")
+    return result
+
+
+@app.post("/api/admin/cases/ingest/diseases/suggest-code")
+def api_admin_ingest_diseases_suggest_code(body: dict = Body(...), user: dict = Depends(require_admin)):
+    result = case_ingest.suggest_disease_code(
+        str((body or {}).get("name_zh") or ""),
+        description=str((body or {}).get("description") or ""),
+        prefer_ai=True,
+    )
+    if not result.get("ok"):
+        raise HTTPException(400, result.get("error") or "生成编码失败")
+    return result
+
+
+@app.delete("/api/admin/cases/ingest/diseases/{disease_code}")
+def api_admin_ingest_diseases_delete(disease_code: str, user: dict = Depends(require_admin)):
+    result = case_ingest.delete_disease(disease_code)
+    if not result.get("ok"):
+        raise HTTPException(400, result.get("error") or "删除病种失败")
+    return result
+
+
+@app.get("/api/admin/cases/ingest/design-hooks")
+def api_admin_ingest_hooks(
+    scene_key: str = "follow_up",
+    disease_code: str | None = None,
+    user: dict = Depends(require_admin),
+):
+    fields = {"disease_code": disease_code} if disease_code else {}
+    return case_ingest.design_hooks_for_scene(scene_key, fields)
+
+
+@app.get("/api/admin/scoring/effective")
+def api_admin_scoring_effective(
+    scene_key: str = "follow_up",
+    disease_code: str | None = None,
+    user: dict = Depends(require_admin),
+):
+    from .case_loader import describe_effective_rubric, load_effective_rubric, scene_rubric_status
+
+    status = scene_rubric_status(scene_key)
+    rubric = load_effective_rubric(scene_key, disease_code)
+    return {
+        "ok": True,
+        "pack_status": status,
+        "pack": describe_effective_rubric(rubric),
+    }
+
+
+@app.get("/api/admin/cases/ingest/drafts")
+def api_admin_ingest_drafts(user: dict = Depends(require_admin)):
+    return {"ok": True, "drafts": case_ingest.list_drafts()}
+
+
+@app.get("/api/admin/cases/ingest/drafts/{draft_id}")
+def api_admin_ingest_get_draft(draft_id: str, user: dict = Depends(require_admin)):
+    draft = case_ingest.get_draft(draft_id)
+    if not draft:
+        raise HTTPException(404, "草稿不存在")
+    return {"ok": True, "draft": draft}
+
+
+@app.post("/api/admin/cases/ingest/drafts")
+def api_admin_ingest_create(body: dict, user: dict = Depends(require_admin)):
+    phase = (body.get("phase") or "").strip() or None
+    if phase == "intake":
+        result = case_ingest.create_intake_draft(
+            mode=(body.get("mode") or "material").strip(),
+            scene_key=(body.get("scene_key") or "").strip(),
+            display_name=(body.get("display_name") or "").strip(),
+            source_text=(body.get("source_text") or "").strip(),
+            source_filename=body.get("source_filename"),
+            file_summary=body.get("file_summary") if isinstance(body.get("file_summary"), dict) else None,
+            disease_code=(body.get("disease_code") or "").strip() or None,
+        )
+        if not result.get("ok"):
+            raise HTTPException(400, result.get("error") or "保存草稿失败")
+        return result
+    agnes = getattr(app.state, "agnes", None) or AgnesClient(get_settings())
+    result = case_ingest.create_and_generate(
+        mode=(body.get("mode") or "").strip(),
+        scene_key=(body.get("scene_key") or "").strip(),
+        display_name=(body.get("display_name") or "").strip(),
+        source_text=(body.get("source_text") or "").strip(),
+        source_filename=body.get("source_filename"),
+        phase=phase,
+        agnes=agnes,
+        disease_code=(body.get("disease_code") or "").strip() or None,
+    )
+    if not result.get("ok"):
+        raise HTTPException(400, result.get("error") or "生成失败")
+    return result
+
+
+@app.post("/api/admin/cases/ingest/drafts/{draft_id}/structure")
+def api_admin_ingest_structure(draft_id: str, body: dict | None = None, user: dict = Depends(require_admin)):
+    agnes = getattr(app.state, "agnes", None) or AgnesClient(get_settings())
+    body = body or {}
+    result = case_ingest.structure_draft(
+        draft_id,
+        agnes=agnes,
+        expanded_text=body.get("expanded_text"),
+    )
+    if not result.get("ok"):
+        raise HTTPException(400, result.get("error") or "整理失败")
+    return result
+
+
+@app.post("/api/admin/cases/ingest/drafts/{draft_id}/revise")
+def api_admin_ingest_revise(draft_id: str, body: dict | None = None, user: dict = Depends(require_admin)):
+    agnes = getattr(app.state, "agnes", None) or AgnesClient(get_settings())
+    body = body or {}
+    result = case_ingest.revise_draft_with_feedback(
+        draft_id,
+        instruction=body.get("instruction") or "",
+        targets=body.get("targets") or [],
+        agnes=agnes,
+    )
+    if not result.get("ok"):
+        raise HTTPException(400, result.get("error") or "修订失败")
+    return result
+
+
+@app.get("/api/admin/cases/ingest/drafts/{draft_id}/versions")
+def api_admin_ingest_versions(draft_id: str, user: dict = Depends(require_admin)):
+    result = case_ingest.list_field_versions(draft_id)
+    if not result.get("ok"):
+        raise HTTPException(404, result.get("error") or "草稿不存在")
+    return result
+
+
+@app.post("/api/admin/cases/ingest/drafts/{draft_id}/versions/{version_id}/restore")
+def api_admin_ingest_restore(draft_id: str, version_id: str, user: dict = Depends(require_admin)):
+    result = case_ingest.restore_field_version(draft_id, version_id)
+    if not result.get("ok"):
+        raise HTTPException(400, result.get("error") or "回溯失败")
+    return result
+
+
+@app.post("/api/admin/cases/ingest/upload")
+async def api_admin_ingest_upload(
+    request: Request,
+    user: dict = Depends(require_admin),
+):
+    """多文件上传：从表单字段 files / file 收取，避免 FastAPI 对可选 List[UploadFile] 的 422。"""
+    form = await request.form()
+    uploads: list[UploadFile] = []
+    seen: set[int] = set()
+    for key in ("files", "file"):
+        for item in form.getlist(key):
+            if not hasattr(item, "read"):
+                continue
+            ident = id(item)
+            if ident in seen:
+                continue
+            seen.add(ident)
+            uploads.append(item)  # type: ignore[arg-type]
+
+    if not uploads:
+        raise HTTPException(400, "请选择至少一个文件")
+
+    items: list[tuple[str, bytes]] = []
+    for uf in uploads:
+        raw = await uf.read()
+        items.append((getattr(uf, "filename", None) or "upload.bin", raw))
+
+    result = case_ingest.merge_material_uploads(items)
+    report_files = result.get("files") or []
+    if not result.get("ok") and not report_files:
+        raise HTTPException(400, result.get("error") or "无法读取文件")
+    return {
+        "ok": bool(result.get("ok")),
+        "error": result.get("error"),
+        "warning": result.get("warning"),
+        "filename": result.get("filename") or (getattr(uploads[0], "filename", None) if uploads else None),
+        "text": result.get("text") or "",
+        "format": result.get("format"),
+        "files": report_files,
+        "summary": result.get("summary") or {},
+        "upload_count": len(items),
+    }
+
+
+@app.patch("/api/admin/cases/ingest/drafts/{draft_id}")
+def api_admin_ingest_patch(draft_id: str, body: dict, user: dict = Depends(require_admin)):
+    result = case_ingest.update_draft_fields(draft_id, body or {})
+    if not result.get("ok"):
+        raise HTTPException(400, result.get("error") or "更新失败")
+    return result
+
+
+@app.post("/api/admin/cases/ingest/drafts/{draft_id}/publish")
+def api_admin_ingest_publish(draft_id: str, user: dict = Depends(require_admin)):
+    result = case_ingest.publish_draft(draft_id)
+    if not result.get("ok"):
+        raise HTTPException(400, result.get("error") or "发布失败")
+    return result
+
+
+@app.delete("/api/admin/cases/ingest/drafts/{draft_id}")
+def api_admin_ingest_delete(draft_id: str, user: dict = Depends(require_admin)):
+    return case_ingest.delete_draft(draft_id)
 
 
 @app.delete("/api/admin/cases/{case_id}")
@@ -1005,4 +1291,17 @@ async def api_admin_avatars_upload(
     )
     if not result.get("ok"):
         raise HTTPException(400, result.get("error") or "上传失败")
+    return result
+
+
+@app.post("/api/admin/avatars/generate")
+def api_admin_avatars_generate(body: AdminPortraitGenerateBody, user: dict = Depends(require_admin)):
+    result = admin_svc.generate_ai_portrait(
+        persona_id=(body.persona_id or "").strip(),
+        prompt=(body.prompt or "").strip() or None,
+        display_hint=(body.display_hint or "").strip() or None,
+        bind=bool(body.bind),
+    )
+    if not result.get("ok"):
+        raise HTTPException(400, result.get("error") or "生成失败")
     return result

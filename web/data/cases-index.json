@@ -3,7 +3,7 @@
     "schema_version": "1.2.0",
     "default_case_id": "CASE-T2DM-PH2-001",
     "default_persona_id": "PER-ELDER-BASIC-01",
-    "note": "三层结构：疾病 → 试验病例 → 受试者。高血压案例源自飞书 SP 案例本地化。"
+    "note": "两轴分类：场景（知情同意 / 随访）× 病种（2型糖尿病 / 高血压）。管理端接入按所选病种挂目录，不再使用「教学病例」杂类。"
   },
   "diseases": [
     {
@@ -19,7 +19,9 @@
           "data_status": "placeholder",
           "version": "0.1.0",
           "phase": "II",
-          "mvp_scenes": ["S1"],
+          "mvp_scenes": [
+            "S1"
+          ],
           "file": "cases/CASE-T2DM-PH2-001.json",
           "one_liner": "口服降糖新药 II 期，知情同意沟通练习",
           "personas": [
@@ -42,6 +44,54 @@
               "data_status": "reviewed"
             }
           ]
+        },
+        {
+          "case_id": "CASE-ADM-CUSTOM-1189B9",
+          "short_title": "周明华 · 知情同意",
+          "title": "周明华 · 知情同意",
+          "data_status": "imported",
+          "version": "0.1.0",
+          "phase": "II",
+          "mvp_scenes": [
+            "S1"
+          ],
+          "file": "cases/CASE-ADM-CUSTOM-1189B9.json",
+          "one_liner": "周明华 · 知情同意",
+          "personas": [
+            {
+              "persona_id": "PER-ADM-897A7752",
+              "display_label": "周明华",
+              "one_liner": "===== sample-material-zhouminghua-icf-with-junk.",
+              "file": "cases/CASE-ADM-CUSTOM-1189B9.json",
+              "is_default": true,
+              "is_trainable": true,
+              "data_status": "imported"
+            }
+          ]
+        },
+        {
+          "case_id": "CASE-ADM-CUSTOM-9FD106",
+          "short_title": "陈美玲 · 随访（询问）",
+          "title": "陈美玲 · 随访（询问）",
+          "data_status": "imported",
+          "version": "0.1.0",
+          "phase": "II",
+          "mvp_scenes": [
+            "S5"
+          ],
+          "file": "cases/CASE-ADM-CUSTOM-9FD106.json",
+          "one_liner": "陈美玲 · 随访（询问）",
+          "personas": [
+            {
+              "persona_id": "PER-ADM-4CE01C36",
+              "display_label": "陈美玲",
+              "one_liner": "【病例全文 · 纯人写测试样例】 姓名：陈美玲 性别：女 年龄：52岁 职业：中学化学老师 场景",
+              "file": "cases/CASE-ADM-CUSTOM-9FD106.json",
+              "is_default": true,
+              "is_trainable": true,
+              "data_status": "imported"
+            }
+          ]
         }
       ]
     },
@@ -58,7 +108,10 @@
           "data_status": "reviewed",
           "version": "1.0.0",
           "phase": "III",
-          "mvp_scenes": ["S4", "S5"],
+          "mvp_scenes": [
+            "S4",
+            "S5"
+          ],
           "file": "cases/CASE-HTN-PH3-W4-001.json",
           "one_liner": "56岁出租车司机李建国，随访：依从性、AE、合并用药、血压记录",
           "personas": [
@@ -70,6 +123,85 @@
               "is_default": true,
               "is_trainable": true,
               "data_status": "reviewed"
+            }
+          ]
+        },
+        {
+          "case_id": "CASE-ADM-CUSTOM-777524",
+          "short_title": "王秀英 · 随访（询问） · 随访（询问）",
+          "title": "王秀英 · 随访（询问） · 随访（询问）",
+          "data_status": "imported",
+          "version": "0.1.0",
+          "phase": "III",
+          "mvp_scenes": [
+            "S5"
+          ],
+          "file": "cases/CASE-ADM-CUSTOM-777524.json",
+          "one_liner": "王秀英 · 随访（询问） · 随访（询问）",
+          "personas": [
+            {
+              "persona_id": "PER-ADM-8D00066C",
+              "display_label": "王秀英 · 随访（询问） · 纺织厂女工（三班倒，近期白班）",
+              "one_liner": "过去7天实际服药5天，漏服2次：第2天出门上班太急忘带药；第5天去女儿家过夜忘记带药。；第3天下",
+              "file": "cases/CASE-ADM-CUSTOM-777524.json",
+              "is_default": true,
+              "is_trainable": true,
+              "data_status": "imported"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "disease_code": "COPD",
+      "name_zh": "慢性阻塞性肺疾病",
+      "summary": "管理端导入",
+      "cases": [
+        {
+          "case_id": "CASE-ADM-CUSTOM-1C64F9",
+          "short_title": "周阿姨 · 家属协同沟通",
+          "title": "周阿姨 · 家属协同沟通",
+          "data_status": "imported",
+          "version": "0.1.0",
+          "phase": "II",
+          "mvp_scenes": [
+            "S1"
+          ],
+          "file": "cases/CASE-ADM-CUSTOM-1C64F9.json",
+          "one_liner": "周阿姨 · 家属协同沟通",
+          "personas": [
+            {
+              "persona_id": "PER-ADM-2BEE88EC",
+              "display_label": "周阿姨",
+              "one_liner": "# 周阿姨 · 家属协同沟通 培训案例  ## 一、使用场景  - 练什么：随访询问时，受试者客",
+              "file": "cases/CASE-ADM-CUSTOM-1C64F9.json",
+              "is_default": true,
+              "is_trainable": true,
+              "data_status": "imported"
+            }
+          ]
+        },
+        {
+          "case_id": "CASE-ADM-CUSTOM-6675FC",
+          "short_title": "小美 · 家属协同沟通",
+          "title": "小美 · 家属协同沟通",
+          "data_status": "imported",
+          "version": "0.1.0",
+          "phase": "II",
+          "mvp_scenes": [
+            "S1"
+          ],
+          "file": "cases/CASE-ADM-CUSTOM-6675FC.json",
+          "one_liner": "小美 · 家属协同沟通",
+          "personas": [
+            {
+              "persona_id": "PER-ADM-72829F36",
+              "display_label": "小美 · 受试者",
+              "one_liner": "妈妈全程在场，会打断提问；小美有时让妈妈「先听着」。；过去两周漏吸吸入剂 3 次（两次顾孙子哭闹",
+              "file": "cases/CASE-ADM-CUSTOM-6675FC.json",
+              "is_default": true,
+              "is_trainable": true,
+              "data_status": "imported"
             }
           ]
         }
@@ -86,7 +218,9 @@
       "disease_code": "T2DM",
       "is_default": true,
       "primary_scene": "informed_consent",
-      "mvp_scenes": ["S1"],
+      "mvp_scenes": [
+        "S1"
+      ],
       "file": "cases/CASE-T2DM-PH2-001.json",
       "one_liner": "68岁男性，血糖控制欠佳，拟参加口服降糖新药试验的知情同意沟通。",
       "default_persona_id": "PER-ELDER-BASIC-01"
@@ -100,7 +234,9 @@
       "disease_code": "T2DM",
       "is_default": false,
       "primary_scene": "informed_consent",
-      "mvp_scenes": ["S1"],
+      "mvp_scenes": [
+        "S1"
+      ],
       "file": "cases/CASE-T2DM-PH2-002.json",
       "one_liner": "72岁女性，脚麻视物模糊，女儿陪同咨询 II 期试验知情同意。",
       "default_persona_id": "PER-ELDER-FEMALE-02"
@@ -114,10 +250,48 @@
       "disease_code": "HTN",
       "is_default": false,
       "primary_scene": "follow_up",
-      "mvp_scenes": ["S4", "S5"],
+      "mvp_scenes": [
+        "S4",
+        "S5"
+      ],
       "file": "cases/CASE-HTN-PH3-W4-001.json",
       "one_liner": "56岁出租车司机，第4周随访：了解服药、漏服、头晕、合并用药与血压记录。",
       "default_persona_id": "PER-HTN-TAXI-01"
+    },
+    {
+      "case_id": "CASE-ADM-CUSTOM-777524",
+      "short_title": "王秀英 · 随访（询问） · 随访（询问）",
+      "title": "王秀英 · 随访（询问） · 随访（询问）",
+      "file": "cases/CASE-ADM-CUSTOM-777524.json",
+      "phase": "III"
+    },
+    {
+      "case_id": "CASE-ADM-CUSTOM-1189B9",
+      "short_title": "周明华 · 知情同意",
+      "title": "周明华 · 知情同意",
+      "file": "cases/CASE-ADM-CUSTOM-1189B9.json",
+      "phase": "II"
+    },
+    {
+      "case_id": "CASE-ADM-CUSTOM-9FD106",
+      "short_title": "陈美玲 · 随访（询问）",
+      "title": "陈美玲 · 随访（询问）",
+      "file": "cases/CASE-ADM-CUSTOM-9FD106.json",
+      "phase": "II"
+    },
+    {
+      "case_id": "CASE-ADM-CUSTOM-1C64F9",
+      "short_title": "周阿姨 · 家属协同沟通",
+      "title": "周阿姨 · 家属协同沟通",
+      "file": "cases/CASE-ADM-CUSTOM-1C64F9.json",
+      "phase": "II"
+    },
+    {
+      "case_id": "CASE-ADM-CUSTOM-6675FC",
+      "short_title": "小美 · 家属协同沟通",
+      "title": "小美 · 家属协同沟通",
+      "file": "cases/CASE-ADM-CUSTOM-6675FC.json",
+      "phase": "II"
     }
   ]
 }

@@ -24,6 +24,7 @@ class AgnesClient:
         *,
         temperature: float = 0.4,
         max_tokens: int = 512,
+        retries: int = 2,
     ) -> dict[str, Any]:
         if not self.configured:
             raise RuntimeError("AGNES_API_KEY 未配置")
@@ -40,24 +41,43 @@ class AgnesClient:
             "max_tokens": max_tokens,
         }
         started = time.perf_counter()
-        try:
-            with httpx.Client(timeout=90.0) as client:
-                resp = client.post(url, headers=headers, json=payload)
-        except httpx.TimeoutException:
-            latency_ms = int((time.perf_counter() - started) * 1000)
-            return {
-                "ok": False,
-                "status_code": 504,
-                "latency_ms": latency_ms,
-                "error": "AI 响应超时，请稍后重试",
-            }
-        except httpx.RequestError as exc:
+        attempts = max(1, int(retries) + 1)
+        last_exc: Exception | None = None
+        resp = None
+        for attempt in range(attempts):
+            try:
+                with httpx.Client(timeout=90.0) as client:
+                    resp = client.post(url, headers=headers, json=payload)
+                break
+            except httpx.TimeoutException:
+                latency_ms = int((time.perf_counter() - started) * 1000)
+                return {
+                    "ok": False,
+                    "status_code": 504,
+                    "latency_ms": latency_ms,
+                    "error": "AI 响应超时，请稍后重试",
+                }
+            except httpx.RequestError as exc:
+                last_exc = exc
+                # DNS / 瞬时断网：短暂退避后重试
+                if attempt + 1 < attempts:
+                    time.sleep(0.4 * (attempt + 1))
+                    continue
+                latency_ms = int((time.perf_counter() - started) * 1000)
+                return {
+                    "ok": False,
+                    "status_code": 0,
+                    "latency_ms": latency_ms,
+                    "error": f"AI 服务连接失败: {exc}",
+                }
+
+        if resp is None:
             latency_ms = int((time.perf_counter() - started) * 1000)
             return {
                 "ok": False,
                 "status_code": 0,
                 "latency_ms": latency_ms,
-                "error": f"AI 服务连接失败: {exc}",
+                "error": f"AI 服务连接失败: {last_exc or 'unknown'}",
             }
 
         latency_ms = int((time.perf_counter() - started) * 1000)
@@ -76,11 +96,9 @@ class AgnesClient:
                 "error": data.get("error") if isinstance(data, dict) else resp.text,
             }
 
-        content = ""
-        try:
-            content = data["choices"][0]["message"]["content"]
-        except Exception:
-            content = ""
+        content = _extract_message_content(data)
+        choice0 = ((data.get("choices") or [{}])[0] if isinstance(data, dict) else {}) or {}
+        finish_reason = choice0.get("finish_reason")
         return {
             "ok": True,
             "status_code": resp.status_code,
@@ -88,5 +106,28 @@ class AgnesClient:
             "request": {**payload, "messages": messages},
             "response": data,
             "content": content,
+            "finish_reason": finish_reason,
             "usage": data.get("usage") if isinstance(data, dict) else None,
         }
+
+
+def _extract_message_content(data: Any) -> str:
+    """兼容 content 字符串 / 分段数组；忽略仅有 reasoning 的空正文。"""
+    try:
+        msg = data["choices"][0]["message"]
+    except Exception:
+        return ""
+    content = msg.get("content")
+    if isinstance(content, list):
+        parts: list[str] = []
+        for part in content:
+            if isinstance(part, str):
+                parts.append(part)
+            elif isinstance(part, dict):
+                text = part.get("text") or part.get("content")
+                if text:
+                    parts.append(str(text))
+        content = "".join(parts)
+    if content is None:
+        return ""
+    return str(content).strip()

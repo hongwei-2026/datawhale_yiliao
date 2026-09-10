@@ -1,24 +1,30 @@
-import { createVoiceController } from './voice.js?v=20260831p42';
-import { createDigitalHumanController } from './digital-human.js?v=20260831p35';
-import { createAdminController, isAdminUser } from './admin.js?v=20260831p41';
+import { createVoiceController } from './voice.js?v=20260909chat';
+import { createDigitalHumanController } from './digital-human.js?v=20260909chat';
+import { createAdminController, isAdminUser } from './admin.js?v=20260910hooks1';
 
 const AUTH_TOKEN_KEY = 'aisp_auth_token';
 const AUTH_USER_KEY = 'aisp_auth_user';
 const PRACTICE_SESSION_KEY = 'aisp_practice_session_id';
-const AUTH_ROUTES = new Set(['practice', 'feedback', 'records', 'admin']);
+/** 学员熟练度阈值：对话场次 + 累计练习时长（毫秒）都达标 → 老手 */
+const UX_VETERAN_SESSIONS = 3;
+const UX_VETERAN_DURATION_MS = 15 * 60 * 1000; // 15 分钟
+const UX_PROFICIENCY_PREFIX = 'aisp_ux_metrics_';
+const AUTH_ROUTES = new Set(['practice', 'feedback', 'records', 'admin', 'admin-cases', 'admin-users']);
 
-/** 学员端主导航（不含系统功能） */
-const STUDENT_ROUTES = [
-  { id: 'guide', label: '使用手册', eyebrow: 'User Manual' },
-  { id: 'practice', label: '模拟对话', eyebrow: 'Practice Chat' },
+/** 学员端主导航（不含系统功能）；顺序会按熟练度重排 */
+const STUDENT_ROUTES_BASE = [
+  { id: 'guide', label: '使用手册', eyebrow: 'User Manual', newbieHint: '第一次从这里开始' },
+  { id: 'practice', label: '模拟对话', eyebrow: 'Practice Chat', regularHint: '老手直接开练' },
   { id: 'records', label: '对话记录', eyebrow: 'Session Records' },
   { id: 'feedback', label: '练习反馈', eyebrow: 'Feedback' },
   { id: 'cases', label: '病例详情资料', eyebrow: 'Case Briefing' },
 ];
+const STUDENT_ROUTES = STUDENT_ROUTES_BASE;
 
-/** 管理端入口（仅 admin 可见） */
+/** 管理端入口（仅 admin 可见）——病例与账号拆开，系统功能仍单独 */
 const ADMIN_NAV = [
-  { id: 'admin', label: '管理端', eyebrow: 'Admin' },
+  { id: 'admin-cases', label: '病例与场景', eyebrow: 'Cases & Scenes' },
+  { id: 'admin-users', label: '账号管理', eyebrow: 'Accounts' },
   { id: 'explain', label: '系统功能', eyebrow: 'System Guide' },
 ];
 
@@ -289,29 +295,31 @@ const ICONS = {
   terms: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>',
   explain: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01"/></svg>',
   admin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9c.3.6.9 1 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
+  'admin-cases': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16l4-2 4 2 4-2 4 2V4a2 2 0 0 0-2-2z"/><path d="M8 8h8M8 12h6"/></svg>',
+  'admin-users': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
 };
 
 /** 与页面同域请求 API（云端 8443、本地 8000 均适用）；勿写死 127.0.0.1 */
 const API_BASE = (typeof location !== 'undefined') ? '' : 'http://127.0.0.1:8000';
 
 const EXPLAIN_SECTIONS = [
-  { id: 'overview', label: '系统概览', hint: '双底座架构' },
+  { id: 'overview', label: '产品总览', hint: '怎么练、怎么评' },
+  { id: 'practice', label: '练习与考核', hint: '对话主战场' },
+  { id: 'rubric', label: '评分说明', hint: '清单 + 参考分' },
+  { id: 'scenes', label: '场景与病例', hint: '知情 / 随访' },
   { id: 'standards', label: '标准解释', hint: '法规白话' },
-  { id: 'rubric', label: '评分说明', hint: '怎么算分' },
-  { id: 'database', label: '数据库', hint: '入库实况' },
-  { id: 'scenes', label: '训练场景', hint: 'S1 知情同意' },
-  { id: 'timeline', label: '效力时间线', hint: '版本节点' },
+  { id: 'database', label: '数据与联通', hint: '入库与 Agnes' },
   { id: 'terms', label: '术语表', hint: '统一叫法' },
 ];
 
-/** 旧 hash 路由 → 系统功能页内锚点 */
+/** 旧 hash 路由 → 系统功能页内锚点（勿纳入学员主路由 id，如 practice） */
 const LEGACY_TO_EXPLAIN = {
   standards: 'standards',
   database: 'database',
   rubric: 'rubric',
   terms: 'terms',
   overview: 'overview',
-  timeline: 'timeline',
+  timeline: 'overview',
   scenes: 'scenes',
 };
 
@@ -340,6 +348,7 @@ let state = {
   terms: null,
   scenes: null,
   guide: null,
+  guideAudience: localStorage.getItem('aisp_guide_audience') || 'trainee', // trainee | admin
   standardsLay: null,
   rubricLay: null,
   casesIndex: null,
@@ -370,6 +379,7 @@ let state = {
     showAllResumes: false,
     feedExpanded: false,
     checkpointOpen: false,
+    leftStackOpen: localStorage.getItem('practiceLeftStackOpen') === '1',
     liveChecklistOpen: false,
     patientAffect: null,
     lastCheckpointDone: null,
@@ -377,6 +387,7 @@ let state = {
     restoring: false,
   },
   practicePickerSearch: '',
+  practicePickerScene: 'all', // all | informed_consent | follow_up | ...
   feedbackData: null,
   feedbackTranscript: [],
   feedbackHistory: [],
@@ -449,6 +460,7 @@ const adminCtrl = createAdminController({
   escapeHtml,
   navigate: (...args) => navigate(...args),
   state,
+  confirmDialog,
 });
 
 const voiceCtrl = createVoiceController({
@@ -498,6 +510,11 @@ const voiceCtrl = createVoiceController({
       error: payload.error || '',
       talkingHeadError: payload.talkingHeadError || '',
     });
+    if (payload.error && /麦克风|不支持语音识别/.test(payload.error) && !state.voice._alertedError) {
+      state.voice._alertedError = payload.error;
+      showPracticeAlertModal('语音不可用', payload.error);
+    }
+    if (!payload.error) state.voice._alertedError = '';
     if (state.route === 'practice') {
       if (!payload.speaking) digitalHumanCtrl.setSpeaking(false);
       const el = $('#voice-status-live');
@@ -507,9 +524,14 @@ const voiceCtrl = createVoiceController({
       const micBtn = $('#voice-mic-btn');
       if (micBtn) {
         const busyMic = state.voice.speaking || state.voice.processing;
-        micBtn.textContent = state.voice.listening ? '停止说话' : '开始说话';
+        micBtn.textContent = state.voice.listening ? '停止' : '说话';
+        micBtn.title = state.voice.listening
+          ? '停止语音输入'
+          : (state.voice.enabled ? '开始语音输入（说完再点停止）' : '点此开启语音模式并开始说话');
         micBtn.classList.toggle('is-hot', state.voice.listening);
-        micBtn.disabled = !state.voice.enabled || busyMic;
+        micBtn.classList.toggle('is-off', !state.voice.enabled);
+        micBtn.disabled = busyMic;
+        micBtn.hidden = false;
       }
       const pauseBtn = $('#voice-pause-btn');
       if (pauseBtn) {
@@ -530,17 +552,19 @@ function voiceStatusText() {
   const v = state.voice;
   if (v.error) return v.error;
   if (v.talkingHeadError) return `${v.talkingHeadError}（已播放语音）`;
-  if (!v.enabled) return '语音已关闭 · 下方可打字发送';
+  if (!v.enabled) {
+    return '语音模式关：可打字；点输入框旁「说话」可一键开启（含 AI 朗读 + 你的语音输入）';
+  }
   if (v.processing) return '正在整理识别结果…';
-  if (v.speaking) return '受试者正在说话…';
+  if (v.speaking) return '受试者正在朗读回复…可点「暂停旁白」';
   if (v.listening) {
     return v.interim
-      ? `正在听… ${v.interim}（实时显示在输入框）`
-      : '正在听你说…说完点「停止说话」，文字会自动填入';
+      ? `正在听你说… ${v.interim}`
+      : '正在听你说…说完再点「停止」，文字会填入输入框';
   }
-  if (!v.speechRecognition) return '浏览器不支持语音识别，请用 Chrome/Edge，或直接打字';
-  if (!v.configured) return '旁白未配置，仍可用「开始说话」输入';
-  return '语音已开 · 点「开始说话」→ 说完点「停止说话」→ 检查输入框后发送';
+  if (!v.speechRecognition) return '语音模式已开（AI 会朗读）；本浏览器不支持语音输入，请打字';
+  if (!v.configured) return '语音模式已开 · 点「说话」可语音输入（旁白未配置，受试者可能无声）';
+  return '语音模式已开：AI 会朗读回复；你可点「说话」语音输入，也可继续打字';
 }
 
 function patientSpeakHooks() {
@@ -548,9 +572,17 @@ function patientSpeakHooks() {
     || state.selectedPersonaId
     || '';
   const affect = state.practice.patientAffect || {};
+  const prosody = affect.tts_prosody || {};
   return {
     personaId,
-    emotion: affect.tts_emotion || '',
+    emotion: affect.tts_emotion || prosody.emotion || '',
+    stance: affect.stance || prosody.stance || '',
+    speed: prosody.speed,
+    vol: prosody.vol,
+    pitch: prosody.pitch,
+    pause_sec: prosody.pause_sec,
+    comma_pause_sec: prosody.comma_pause_sec,
+    prosodyLabel: prosody.label || '',
     onGenerating: ({ message }) => {
       digitalHumanCtrl.setThinking(true);
       digitalHumanCtrl.setStatusHint(message || '正在准备受试者语音…');
@@ -574,8 +606,17 @@ function patientSpeakHooks() {
   };
 }
 
+function isSystemPatientFallback(text) {
+  const t = String(text || '').trim();
+  if (!t) return true;
+  return t.startsWith('（系统）')
+    || t.includes('暂时连不上模拟病人')
+    || t.includes('模拟受试者暂时没接上');
+}
+
 async function speakLatestPatient() {
-  if (!state.digitalHuman.enabled && !state.voice.enabled) return;
+  // 仅「语音模式」开启时才请求 TTS；Live2D 开着也不自动朗读
+  if (!state.voice.enabled) return;
   if (typeof voiceCtrl.speakPatientNarration !== 'function') {
     console.warn('voice.js 版本过旧，请强制刷新页面（Ctrl+Shift+R）');
     return;
@@ -584,7 +625,7 @@ async function speakLatestPatient() {
   for (let i = msgs.length - 1; i >= 0; i -= 1) {
     if (msgs[i].role === 'patient' && msgs[i].content) {
       const text = stripPatientMarkdown(msgs[i].content);
-      if (!text) continue;
+      if (!text || isSystemPatientFallback(text)) continue;
       digitalHumanCtrl.setSubtitle(text);
       digitalHumanCtrl.setThinking(false);
       await voiceCtrl.speakPatientNarration(text, patientSpeakHooks());
@@ -621,12 +662,18 @@ function stripPatientMarkdown(text) {
 
 function buildGalDialogFeed(messages, personaLabelText, busy) {
   const visible = (messages || []).filter((m) => m.role !== 'system');
-  const lines = visible.map((m) => `
+  const lines = visible.map((m) => {
+    const affect = m.role === 'patient' ? resolveMessageAffect(m, messages) : null;
+    return `
     <div class="gal-line role-${m.role}${m._optimistic ? ' is-pending' : ''}">
-      <span class="gal-line-name">${escapeHtml(galSpeakerLabel(m.role, personaLabelText))}${m._optimistic ? ' · 已发送' : ''}</span>
+      <div class="gal-line-head">
+        <span class="gal-line-name">${escapeHtml(galSpeakerLabel(m.role, personaLabelText))}${m._optimistic ? ' · 已发送' : ''}</span>
+        ${affectChipHtml(affect)}
+      </div>
       <p class="gal-line-text">${escapeHtml(stripPatientMarkdown(m.content || (m.role === 'patient' ? '（受试者未回应，请重试）' : '')))}</p>
     </div>
-  `).join('');
+  `;
+  }).join('');
   const typing = busy ? `
     <div class="gal-line role-system is-typing">
       <span class="gal-line-name">${escapeHtml(personaLabelText || '受试者')}</span>
@@ -711,6 +758,171 @@ function isAuthenticated() {
   return !!(state.auth.token && state.auth.user);
 }
 
+function uxProfileStorageKey(user = state.auth.user) {
+  const id = user?.id || user?.username || 'guest';
+  return `${UX_PROFICIENCY_PREFIX}${id}`;
+}
+
+function loadUxProfile(user = state.auth.user) {
+  try {
+    const raw = localStorage.getItem(uxProfileStorageKey(user));
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveUxProfile(patch, user = state.auth.user) {
+  if (!user || isAdminUser(user)) return loadUxProfile(user);
+  const next = {
+    ...loadUxProfile(user),
+    ...patch,
+    updatedAt: Date.now(),
+  };
+  try {
+    localStorage.setItem(uxProfileStorageKey(user), JSON.stringify(next));
+  } catch { /* ignore */ }
+  return next;
+}
+
+function parseSessionDurationMs(session) {
+  const start = Date.parse(session?.started_at || '');
+  if (!Number.isFinite(start)) return 0;
+  let end = Date.parse(session?.ended_at || '');
+  if (!Number.isFinite(end)) {
+    // 进行中的会话：按已开练时长计入（封顶单场 2 小时，避免异常）
+    if (session?.status === 'in_progress') {
+      end = Math.min(Date.now(), start + 2 * 60 * 60 * 1000);
+    } else {
+      return 0;
+    }
+  }
+  return Math.max(0, end - start);
+}
+
+function computeMetricsFromHistory(sessions = []) {
+  const list = sessions || [];
+  const sessionCount = list.length;
+  const historyMs = list.reduce((sum, s) => sum + parseSessionDurationMs(s), 0);
+  return { sessionCount, historyMs };
+}
+
+function getUxMetrics(user = state.auth.user) {
+  const p = loadUxProfile(user);
+  const fromHistory = computeMetricsFromHistory(state.practiceHistory || []);
+  const sessionCount = Math.max(Number(p.sessionCount) || 0, fromHistory.sessionCount);
+  const practiceMs = Math.max(Number(p.practiceMs) || 0, fromHistory.historyMs)
+    + (Number(p.liveActiveMs) || 0);
+  return {
+    sessionCount,
+    practiceMs,
+    needSessions: UX_VETERAN_SESSIONS,
+    needMs: UX_VETERAN_DURATION_MS,
+  };
+}
+
+function getProficiencyProgress(user = state.auth.user) {
+  const m = getUxMetrics(user);
+  const sessionPct = Math.min(100, Math.round((100 * m.sessionCount) / m.needSessions));
+  const timePct = Math.min(100, Math.round((100 * m.practiceMs) / m.needMs));
+  // 两次都要达标才变老手：总进度取较短板
+  const overall = Math.min(sessionPct, timePct);
+  return {
+    ...m,
+    sessionPct,
+    timePct,
+    overall,
+    remainingSessions: Math.max(0, m.needSessions - m.sessionCount),
+    remainingMs: Math.max(0, m.needMs - m.practiceMs),
+  };
+}
+
+function formatDurationShort(ms) {
+  const totalSec = Math.max(0, Math.round(ms / 1000));
+  const min = Math.floor(totalSec / 60);
+  const sec = totalSec % 60;
+  if (min >= 60) {
+    const h = Math.floor(min / 60);
+    const m = min % 60;
+    return `${h}小时${m}分`;
+  }
+  if (min > 0) return `${min}分${sec ? `${sec}秒` : ''}`;
+  return `${sec}秒`;
+}
+
+/** newbie | regular | admin —— 由场次+时长自动判定，不可手切 */
+function getUserProficiency(user = state.auth.user) {
+  if (!user) return 'newbie';
+  if (isAdminUser(user)) return 'admin';
+  const prog = getProficiencyProgress(user);
+  return (prog.sessionCount >= UX_VETERAN_SESSIONS && prog.practiceMs >= UX_VETERAN_DURATION_MS)
+    ? 'regular'
+    : 'newbie';
+}
+
+function defaultRouteForUser(user = state.auth.user) {
+  if (!user) return 'guide';
+  if (isAdminUser(user)) return 'admin-cases';
+  return getUserProficiency(user) === 'regular' ? 'practice' : 'guide';
+}
+
+function studentRoutesForNav() {
+  const base = STUDENT_ROUTES_BASE.map((r) => ({ ...r }));
+  if (getUserProficiency() !== 'regular') return base;
+  const practice = base.find((r) => r.id === 'practice');
+  const rest = base.filter((r) => r.id !== 'practice');
+  return practice ? [practice, ...rest] : base;
+}
+
+function syncUxFromHistory(sessions, user = state.auth.user) {
+  if (!user || isAdminUser(user)) return;
+  const { sessionCount, historyMs } = computeMetricsFromHistory(sessions);
+  const p = loadUxProfile(user);
+  saveUxProfile({
+    sessionCount: Math.max(Number(p.sessionCount) || 0, sessionCount),
+    practiceMs: Math.max(Number(p.practiceMs) || 0, historyMs),
+  }, user);
+}
+
+let practiceTimerStartedAt = null;
+
+function startPracticeTimer() {
+  if (!isAuthenticated() || isAdminUser(state.auth.user)) return;
+  if (!state.practice.sessionId || state.practice.status === 'completed') return;
+  if (practiceTimerStartedAt) return;
+  practiceTimerStartedAt = Date.now();
+}
+
+function flushPracticeTimer() {
+  if (!practiceTimerStartedAt) return;
+  if (!isAuthenticated() || isAdminUser(state.auth.user)) {
+    practiceTimerStartedAt = null;
+    return;
+  }
+  const delta = Math.max(0, Date.now() - practiceTimerStartedAt);
+  practiceTimerStartedAt = null;
+  if (delta < 1000) return;
+  const p = loadUxProfile();
+  saveUxProfile({
+    practiceMs: (Number(p.practiceMs) || 0) + delta,
+  });
+  renderUserBar();
+  renderNav();
+}
+
+function markPracticeStarted() {
+  if (!isAuthenticated() || isAdminUser(state.auth.user)) return;
+  startPracticeTimer();
+  loadAllSessions().then(() => {
+    renderUserBar();
+    renderNav();
+  });
+}
+
+function markGuideCompleted() {
+  // 手册读完不升老手；老手由场次+时长指标自动判定
+}
+
 async function restoreAuth() {
   if (!state.auth.token) return;
   try {
@@ -751,7 +963,15 @@ async function submitAuthForm(mode) {
     if (!res.ok) throw new Error(data.detail || data.error || `HTTP ${res.status}`);
     resetPracticeClientState();
     saveAuth(data.token, data.user);
-    navigate(isAdminUser(data.user) ? 'admin' : 'practice');
+    if (mode === 'register' && !isAdminUser(data.user)) {
+      // 新账号从零指标开始 → 新手路径（使用手册）
+      try { localStorage.removeItem(uxProfileStorageKey(data.user)); } catch { /* ignore */ }
+      saveUxProfile({ sessionCount: 0, practiceMs: 0 }, data.user);
+    }
+    if (!isAdminUser(data.user)) {
+      await loadAllSessions();
+    }
+    navigate(defaultRouteForUser(data.user));
   } catch (err) {
     let msg = String(err.message || err);
     if (/用户名或密码错误|401/.test(msg)) {
@@ -768,6 +988,7 @@ function renderUserBar() {
   const el = $('#user-bar');
   if (!el) return;
   if (!isAuthenticated()) {
+    el.classList.remove('user-bar--trainee', 'user-bar--admin');
     el.innerHTML = `
       <button type="button" class="user-bar-btn" id="user-login-btn">登录 / 注册</button>
     `;
@@ -775,18 +996,78 @@ function renderUserBar() {
     return;
   }
   const u = state.auth.user;
-  const roleTag = isAdminUser(u) ? '<span class="user-bar-role">管理员</span>' : '';
+  const isAdmin = isAdminUser(u);
+  el.classList.toggle('user-bar--admin', isAdmin);
+  el.classList.toggle('user-bar--trainee', !isAdmin);
+
+  // 管理端：保持原来的简洁账号区，不展示学员新手/老手进度
+  if (isAdmin) {
+    el.innerHTML = `
+      <div class="user-bar-profile">
+        <span class="user-bar-avatar">${escapeHtml((u.display_name || u.username || '?').slice(0, 1))}</span>
+        <div class="user-bar-text">
+          <strong>${escapeHtml(u.display_name || u.username)} <span class="user-bar-role">管理员</span></strong>
+          <small>@${escapeHtml(u.username)}</small>
+        </div>
+      </div>
+      <button type="button" class="user-bar-logout" id="user-logout-btn">退出</button>
+    `;
+    $('#user-logout-btn')?.addEventListener('click', () => {
+      flushPracticeTimer();
+      clearAuth();
+      renderNav();
+      if (AUTH_ROUTES.has(state.route) || state.route === 'explain') navigate('auth');
+      else renderUserBar();
+    });
+    return;
+  }
+
+  const prof = getUserProficiency(u);
+  const prog = getProficiencyProgress(u);
+  const stageTag = prof === 'regular'
+    ? '<span class="user-stage-tag is-veteran">老手</span>'
+    : '<span class="user-stage-tag is-newbie">新手</span>';
+  const progressHtml = prog && prof === 'newbie' ? `
+    <div class="user-stage-progress" title="需满 ${prog.needSessions} 场模拟对话，且累计练习满 ${Math.round(prog.needMs / 60000)} 分钟，才自动成为老手">
+      <div class="user-stage-progress-head">
+        <span>升级进度</span>
+        <strong>${prog.overall}%</strong>
+      </div>
+      <div class="user-stage-row">
+        <div class="user-stage-row-label">
+          <span>对话场次</span>
+          <em>${prog.sessionCount}/${prog.needSessions}</em>
+        </div>
+        <div class="user-stage-progress-track" aria-hidden="true">
+          <div class="user-stage-progress-fill is-sessions" style="width:${prog.sessionPct}%"></div>
+        </div>
+      </div>
+      <div class="user-stage-row">
+        <div class="user-stage-row-label">
+          <span>练习时长</span>
+          <em>${formatDurationShort(prog.practiceMs)} / ${Math.round(prog.needMs / 60000)}分</em>
+        </div>
+        <div class="user-stage-progress-track" aria-hidden="true">
+          <div class="user-stage-progress-fill is-time" style="width:${prog.timePct}%"></div>
+        </div>
+      </div>
+      <p class="user-stage-progress-meta">两项都满才会变成老手 · 登录直达模拟对话</p>
+    </div>` : (prog && prof === 'regular' ? `
+    <p class="user-stage-veteran-note">已达老手：登录直达模拟对话</p>
+  ` : '');
   el.innerHTML = `
     <div class="user-bar-profile">
       <span class="user-bar-avatar">${escapeHtml((u.display_name || u.username || '?').slice(0, 1))}</span>
       <div class="user-bar-text">
-        <strong>${escapeHtml(u.display_name || u.username)} ${roleTag}</strong>
+        <strong>${escapeHtml(u.display_name || u.username)} ${stageTag}</strong>
         <small>@${escapeHtml(u.username)}</small>
       </div>
     </div>
+    ${progressHtml}
     <button type="button" class="user-bar-logout" id="user-logout-btn">退出</button>
   `;
   $('#user-logout-btn')?.addEventListener('click', () => {
+    flushPracticeTimer();
     clearAuth();
     renderNav();
     if (AUTH_ROUTES.has(state.route) || state.route === 'explain') navigate('auth');
@@ -801,7 +1082,7 @@ function renderAuth() {
     <div class="auth-page">
       <div class="auth-card">
         <h3>研究者账号</h3>
-        <p class="auth-sub">注册或登录后，你的模拟对话与练习反馈将<strong>仅自己可见</strong>。</p>
+        <p class="auth-sub">新账号为<strong>新手</strong>（先进使用手册）。模拟对话满 ${UX_VETERAN_SESSIONS} 场且累计练习满 ${Math.round(UX_VETERAN_DURATION_MS / 60000)} 分钟后自动成为<strong>老手</strong>，登录直达模拟对话。记录<strong>仅自己可见</strong>。</p>
         <div class="auth-tabs">
           <button type="button" class="auth-tab ${mode === 'login' ? 'active' : ''}" data-auth-mode="login">登录</button>
           <button type="button" class="auth-tab ${mode === 'register' ? 'active' : ''}" data-auth-mode="register">注册</button>
@@ -829,10 +1110,11 @@ function renderAuth() {
             <div class="auth-quick-row">
               <button type="button" class="auth-quick-btn" data-fill-user="admin" data-fill-pass="Admin2026">管理端 · admin</button>
               <button type="button" class="auth-quick-btn" data-fill-user="history" data-fill-pass="History2026">学员 · history</button>
+              <button type="button" class="auth-quick-btn" data-fill-user="newbie" data-fill-pass="Newbie2026">新手 · newbie</button>
             </div>
           </div>
         ` : ''}
-        <p class="auth-foot">无需登录也可浏览使用手册与病例资料。系统功能在管理端。</p>
+        <p class="auth-foot">无需登录也可浏览使用手册与病例资料。练对话请登录学员账号。</p>
         <button type="button" class="auth-back-link" id="auth-back-link">← 返回使用手册</button>
       </div>
     </div>
@@ -939,11 +1221,17 @@ function priorityLabel(p) {
 }
 
 function renderNavButtons(routes, container) {
-  container.innerHTML = routes.map(
-    (r) => `<button class="nav-btn ${state.route === r.id ? 'active' : ''}" data-route="${r.id}">
-      ${ICONS[r.id] || ''}<span>${r.label}</span>
-    </button>`,
-  ).join('');
+  const prof = isAdminUser(state.auth.user) ? 'admin' : getUserProficiency();
+  container.innerHTML = routes.map((r) => {
+    const isPrimary = (prof === 'newbie' && r.id === 'guide')
+      || (prof === 'regular' && r.id === 'practice');
+    const badge = (prof === 'newbie' && r.id === 'guide')
+      ? '<em class="nav-badge">新手</em>'
+      : ((prof === 'regular' && r.id === 'practice') ? '<em class="nav-badge nav-badge--go">开练</em>' : '');
+    return `<button class="nav-btn ${state.route === r.id ? 'active' : ''}${isPrimary ? ' is-primary-path' : ''}" data-route="${r.id}">
+      ${ICONS[r.id] || ''}<span>${r.label}</span>${badge}
+    </button>`;
+  }).join('');
   container.querySelectorAll('[data-route]').forEach((btn) => {
     btn.addEventListener('click', () => navigate(btn.dataset.route));
   });
@@ -951,9 +1239,18 @@ function renderNavButtons(routes, container) {
 
 function renderNav() {
   const routes = isAdminUser(state.auth.user)
-    ? [...STUDENT_ROUTES, ...ADMIN_NAV]
-    : STUDENT_ROUTES;
-  renderNavButtons(routes, $('#nav'));
+    ? [...STUDENT_ROUTES_BASE, ...ADMIN_NAV]
+    : studentRoutesForNav();
+  const nav = $('#nav');
+  renderNavButtons(routes, nav);
+  const label = document.querySelector('.nav-label');
+  if (label) {
+    if (isAdminUser(state.auth.user)) label.textContent = '功能导航';
+    else {
+      const prof = getUserProficiency();
+      label.textContent = prof === 'regular' ? '老手路径 · 优先模拟对话' : '新手路径 · 优先使用手册';
+    }
+  }
 }
 
 function setPage(title, desc) {
@@ -966,10 +1263,12 @@ function setPage(title, desc) {
 
 function parseHash() {
   const raw = location.hash.replace('#', '').trim();
-  if (!raw) return { route: 'guide', section: null };
-  if (raw === 'admin') return { route: 'admin', section: null };
+  if (!raw) {
+    // 无 hash：按熟练度落地（新手手册 / 熟手练习 / 管理端病例）
+    return { route: defaultRouteForUser(state.auth.user), section: null };
+  }
+  if (raw === 'admin') return { route: 'admin-cases', section: null };
   if (raw === 'explain') return { route: 'explain', section: 'overview' };
-  if (LEGACY_TO_EXPLAIN[raw]) return { route: 'explain', section: LEGACY_TO_EXPLAIN[raw] };
   if (raw.startsWith('explain-')) {
     const section = raw.slice(8);
     if (EXPLAIN_SECTIONS.some((s) => s.id === section)) {
@@ -977,10 +1276,12 @@ function parseHash() {
     }
     return { route: 'explain', section: 'overview' };
   }
+  // 学员 / 管理主路由优先，避免被 LEGACY_TO_EXPLAIN 误伤（曾把 practice 导去系统功能）
   if (STUDENT_ROUTES.some((r) => r.id === raw) || ADMIN_NAV.some((r) => r.id === raw)) {
     return { route: raw, section: null };
   }
   if (raw === 'auth') return { route: 'auth', section: null };
+  if (LEGACY_TO_EXPLAIN[raw]) return { route: 'explain', section: LEGACY_TO_EXPLAIN[raw] };
   return { route: 'guide', section: null };
 }
 
@@ -992,7 +1293,7 @@ function navEntryLabel(entry) {
     const sec = EXPLAIN_SECTIONS.find((s) => s.id === entry.section);
     return sec ? `系统功能 · ${sec.label}` : '系统功能';
   }
-  return ROUTES.find((r) => r.id === entry.route)?.label || '上一页';
+  return [...STUDENT_ROUTES, ...ADMIN_NAV].find((r) => r.id === entry.route)?.label || '上一页';
 }
 
 function renderPageBackBar() {
@@ -1022,7 +1323,11 @@ function goBack() {
 
 function navigate(route, section = null, opts = {}) {
   const { replace = false, fromBack = false, skipHistory = false } = opts;
-  if (LEGACY_TO_EXPLAIN[route]) {
+  const isPrimaryRoute = STUDENT_ROUTES.some((r) => r.id === route)
+    || ADMIN_NAV.some((r) => r.id === route)
+    || route === 'auth'
+    || route === 'admin';
+  if (!isPrimaryRoute && LEGACY_TO_EXPLAIN[route]) {
     section = LEGACY_TO_EXPLAIN[route];
     route = 'explain';
   }
@@ -1032,7 +1337,7 @@ function navigate(route, section = null, opts = {}) {
     section = null;
   }
   // 管理端 / 系统功能仅管理员
-  if ((route === 'admin' || route === 'explain') && !isAdminUser(state.auth.user)) {
+  if ((route === 'admin' || route === 'admin-cases' || route === 'admin-users' || route === 'explain') && !isAdminUser(state.auth.user)) {
     if (!isAuthenticated()) {
       state.auth.error = '请先登录管理员账号';
       route = 'auth';
@@ -1042,11 +1347,15 @@ function navigate(route, section = null, opts = {}) {
     }
     section = null;
   }
+  if (route === 'admin') route = 'admin-cases';
   if (route === 'explain' && !section) {
     section = state.explainSection || 'overview';
   }
   const prevRoute = state.route;
   const prevSection = state.explainSection;
+  if (prevRoute === 'practice' && route !== 'practice') {
+    flushPracticeTimer();
+  }
   // 离开练习页前先把数字人壳挪走，避免被 viewEl.innerHTML 一并拆掉导致回来换脸
   if (prevRoute === 'practice' && route !== 'practice' && state.practice.sessionId) {
     digitalHumanCtrl.parkShell();
@@ -1062,6 +1371,7 @@ function navigate(route, section = null, opts = {}) {
   }
   state.route = route;
   state.explainSection = section || state.explainSection || 'overview';
+  document.body.classList.toggle('auth-focus', route === 'auth');
   renderNav();
   renderView();
   const nextHash = route === 'explain' ? `explain-${state.explainSection}` : route;
@@ -1072,9 +1382,11 @@ function navigate(route, section = null, opts = {}) {
   if (route === 'feedback') loadFeedbackPage();
   if (route === 'practice') loadPracticePage();
   if (route === 'records') loadRecordsPage();
-  if (route === 'admin') adminCtrl.loadAll().then(() => {
-    if (state.route === 'admin') renderView();
-  }).catch(() => {});
+  if (route === 'admin' || route === 'admin-cases' || route === 'admin-users') {
+    adminCtrl.loadAll().then(() => {
+      if (state.route === 'admin' || state.route === 'admin-cases' || state.route === 'admin-users') renderView();
+    }).catch(() => {});
+  }
 }
 
 function switchExplainSection(id) {
@@ -1086,16 +1398,73 @@ function switchExplainSection(id) {
 function openModal(html, opts = {}) {
   modalBody.innerHTML = html;
   modal.querySelector('.modal-panel')?.classList.toggle('case-modal-wide', !!opts.wide);
+  modal.querySelector('.modal-panel')?.classList.toggle('modal-panel--status', !!opts.status);
+  modal.classList.toggle('is-locked', !!opts.lock);
+  modal.querySelector('.modal-close')?.toggleAttribute('hidden', !!opts.lock);
   modal.classList.remove('hidden');
   modal.setAttribute('aria-hidden', 'false');
   document.body.style.overflow = 'hidden';
 }
 
-function closeModal() {
+function closeModal({ force = false } = {}) {
+  if (modal.classList.contains('is-locked') && !force) return;
+  modal.classList.remove('is-locked');
   modal.querySelector('.modal-panel')?.classList.remove('case-modal-wide');
+  modal.querySelector('.modal-panel')?.classList.remove('modal-panel--status');
+  modal.querySelector('.modal-close')?.removeAttribute('hidden');
   modal.classList.add('hidden');
   modal.setAttribute('aria-hidden', 'true');
   document.body.style.overflow = '';
+}
+
+function showPracticeLoadingModal() {
+  openModal(`
+    <div class="practice-status-modal" role="status" aria-live="polite">
+      <div class="practice-status-spinner" aria-hidden="true"></div>
+      <h2>正在生成练习反馈</h2>
+      <p>系统正在对照规范清单评分，通常需要十几秒到几十秒，请稍候…</p>
+      <p class="practice-status-note">请勿关闭页面</p>
+    </div>
+  `, { lock: true, status: true });
+}
+
+function showPracticeAlertModal(title, message) {
+  openModal(`
+    <div class="practice-status-modal is-alert">
+      <div class="practice-status-icon" aria-hidden="true">!</div>
+      <h2>${escapeHtml(title || '提示')}</h2>
+      <p>${escapeHtml(message || '')}</p>
+      <button type="button" class="practice-status-ok" data-practice-status-ok>知道了</button>
+    </div>
+  `, { status: true });
+  modalBody.querySelector('[data-practice-status-ok]')?.addEventListener('click', () => closeModal({ force: true }));
+}
+
+/** 站内确认框（替代 window.confirm） */
+function confirmDialog(message, opts = {}) {
+  const title = opts.title || '请确认';
+  const okText = opts.okText || '确定';
+  const cancelText = opts.cancelText || '取消';
+  const danger = opts.danger !== false;
+  return new Promise((resolve) => {
+    openModal(`
+      <div class="practice-status-modal is-alert">
+        <div class="practice-status-icon" aria-hidden="true">!</div>
+        <h2>${escapeHtml(title)}</h2>
+        <p>${escapeHtml(message || '')}</p>
+        <div class="admin-confirm-actions">
+          <button type="button" class="admin-btn" data-confirm-cancel>${escapeHtml(cancelText)}</button>
+          <button type="button" class="admin-btn ${danger ? 'danger' : 'primary'}" data-confirm-ok>${escapeHtml(okText)}</button>
+        </div>
+      </div>
+    `, { lock: true, status: true });
+    const finish = (val) => {
+      closeModal({ force: true });
+      resolve(val);
+    };
+    modalBody.querySelector('[data-confirm-ok]')?.addEventListener('click', () => finish(true));
+    modalBody.querySelector('[data-confirm-cancel]')?.addEventListener('click', () => finish(false));
+  });
 }
 
 function showStandardDetail(id) {
@@ -1181,7 +1550,7 @@ function trustHumanLabel(trust) {
 
 const STANCE_LABEL_MAP = {
   cooperative: '愿意配合',
-  guarded: '有点担心',
+  guarded: '有所保留',
   defensive: '有点抵触',
   withdrawn: '不太想多说',
   relieved: '放松了一些',
@@ -1201,6 +1570,83 @@ const STANCE_MOOD_ICON = {
   withdrawn: '😶',
   relieved: '😌',
 };
+
+const TTS_EMOTION_LABEL = {
+  neutral: '语气平稳',
+  happy: '语气放松',
+  sad: '语气低落',
+  angry: '语气冲',
+  calm: '语气平静',
+  fearful: '语气发慌',
+  surprised: '语气惊讶',
+};
+
+function affectChipHtml(affect, { tone = 'gal' } = {}) {
+  if (!affect) return '';
+  const mood = affect.stance_label || STANCE_LABEL_MAP[affect.stance] || '';
+  const emo = affect.emotion_label || TTS_EMOTION_LABEL[affect.tts_emotion] || '';
+  const trust = affect.trust != null ? trustHumanLabel(affect.trust) : '';
+  const depth = affect.depth_label || '';
+  const pill = tone === 'transcript' ? 'transcript-affect-pill' : 'gal-affect-pill';
+  const wrap = tone === 'transcript' ? 'transcript-line-affect' : 'gal-line-affect';
+  const bits = [
+    mood ? `<span class="${pill} mood">${escapeHtml(mood)}</span>` : '',
+    emo ? `<span class="${pill} emo">${escapeHtml(emo)}</span>` : '',
+    trust ? `<span class="${pill} trust">信任：${escapeHtml(trust)}</span>` : '',
+    depth ? `<span class="${pill} depth">${escapeHtml(depth)}</span>` : '',
+  ].filter(Boolean);
+  if (!bits.length) return '';
+  const title = affect._inferred
+    ? '本轮情绪（旧会话无日志，按话术推断）'
+    : '本轮受试者情绪与沟通状态';
+  return `<div class="${wrap}" title="${title}">${bits.join('')}</div>`;
+}
+
+function resolveMessageAffect(message, messages) {
+  if (message?.affect) return message.affect;
+  if (message?.role !== 'patient') return null;
+  // 旧会话无 emotion_log：用当前会话态或文本推断兜底
+  const inferred = inferAffectFromDialogue(null, [message]);
+  return {
+    stance: inferred.stance,
+    stance_label: inferred.stance_label,
+    trust: inferred.trust,
+    depth_label: inferred.depth_label,
+    emotion_label: TTS_EMOTION_LABEL.neutral,
+    _inferred: true,
+  };
+}
+
+function buildEmotionTransitionHtml(messages, patientAffect) {
+  const patientMsgs = (messages || []).filter((m) => m.role === 'patient');
+  if (patientMsgs.length < 2 && !patientAffect) return '';
+  const last = patientMsgs[patientMsgs.length - 1];
+  const prev = patientMsgs[patientMsgs.length - 2];
+  const curA = resolveMessageAffect(last, messages) || patientAffect || {};
+  const prevA = prev ? resolveMessageAffect(prev, messages) : null;
+  const curLabel = curA.stance_label || STANCE_LABEL_MAP[curA.stance] || '—';
+  const curEmo = curA.emotion_label || TTS_EMOTION_LABEL[curA.tts_emotion] || '';
+  if (!prevA) {
+    return `
+      <div class="live-rail-emotion-shift">
+        <span class="live-rail-label">情绪轨迹</span>
+        <p>当前：<strong>${escapeHtml(curLabel)}</strong>${curEmo ? ` · ${escapeHtml(curEmo)}` : ''}</p>
+      </div>`;
+  }
+  const prevLabel = prevA.stance_label || STANCE_LABEL_MAP[prevA.stance] || '—';
+  const prevEmo = prevA.emotion_label || TTS_EMOTION_LABEL[prevA.tts_emotion] || '';
+  const changed = prevLabel !== curLabel || prevEmo !== curEmo;
+  return `
+    <div class="live-rail-emotion-shift${changed ? ' is-changed' : ''}">
+      <span class="live-rail-label">情绪转变</span>
+      <p>
+        <span>${escapeHtml(prevLabel)}${prevEmo ? `（${escapeHtml(prevEmo)}）` : ''}</span>
+        <span class="live-rail-arrow" aria-hidden="true">→</span>
+        <strong>${escapeHtml(curLabel)}${curEmo ? `（${escapeHtml(curEmo)}）` : ''}</strong>
+      </p>
+      ${changed ? '<small>本轮相对上一句有变化，可对照对话气泡上的标签</small>' : '<small>相对上一句情绪较稳</small>'}
+    </div>`;
+}
 
 function inferStanceFromPatientText(text) {
   const t = text || '';
@@ -1235,11 +1681,15 @@ function inferTrustFromPatientText(text, stance) {
 function affectReactionHint(affect, lastText) {
   const stance = affect.stance || '';
   const t = lastText || '';
-  if (stance === 'defensive' || /什么意思|骗人|忽悠/.test(t)) return '可能对您的说法有抵触，宜先正面回应顾虑';
-  if (stance === 'guarded' || /担心|副作用|怎么办|严不严重/.test(t)) return '正在顾虑风险或疗效，需要更具体、诚实的说明';
-  if (stance === 'withdrawn') return '不太想继续深入，建议放慢节奏、先倾听';
+  if (stance === 'defensive' || /什么意思|骗人|忽悠|别生气/.test(t)) {
+    return '可能觉得被批评或被冒犯了，宜先道歉/安抚，再具体追问';
+  }
+  if (stance === 'withdrawn') return '不太想继续深入，建议放慢节奏、先倾听与安抚';
+  if (stance === 'guarded' || /担心|副作用|怎么办|严不严重/.test(t)) {
+    return '还有顾虑，需要更具体、诚实的说明；别催、别压';
+  }
   if (stance === 'cooperative') return '愿意继续听您讲，可按检查点逐项说明';
-  if (stance === 'relieved') return '紧张感有所缓解，可顺势补充关键信息';
+  if (stance === 'relieved') return '紧张感有所缓解，可顺势追问具体日期与细节';
   if (!t) return '发送话术后，会根据受试者回复更新';
   return '继续观察受试者下一句话的反应';
 }
@@ -1279,6 +1729,15 @@ function inferAffectFromDialogue(patientAffect, messages) {
     affect.trust = inferTrustFromPatientText(lastText, affect.stance);
   } else if (affect.trust == null && patientMsgs.length) {
     affect.trust = 52;
+  }
+
+  if (!affect.emotion_label) {
+    affect.emotion_label = TTS_EMOTION_LABEL[affect.tts_emotion]
+      || (affect.stance === 'defensive' ? TTS_EMOTION_LABEL.angry
+        : affect.stance === 'relieved' || affect.stance === 'cooperative' ? TTS_EMOTION_LABEL.happy
+          : affect.stance === 'withdrawn' ? TTS_EMOTION_LABEL.sad
+            : affect.stance === 'guarded' ? TTS_EMOTION_LABEL.fearful
+              : TTS_EMOTION_LABEL.neutral);
   }
 
   affect._lastPatientSnippet = lastText
@@ -1324,7 +1783,7 @@ function buildCoverageProgressHtml(messages, { compact = false } = {}) {
       <div class="checkpoint-progress-track" aria-hidden="true">
         <div class="checkpoint-progress-fill" style="width:${pct}%"></div>
       </div>
-      <p class="live-rail-progress-note">随对话更新 · 点「沟通检查点」看明细</p>
+      <p class="live-rail-progress-note">随对话更新 · 下方可看检查点明细</p>
     </div>`;
 }
 
@@ -1351,6 +1810,12 @@ function buildLiveFeedbackRailHtml(messages, patientAffect, opts = {}) {
           </div>
         </div>
 
+        ${!busy ? `
+        <div class="live-rail-row live-rail-row--emotion">
+          <span class="live-rail-label">表达情绪</span>
+          <span class="live-rail-value">${escapeHtml(affect.emotion_label || TTS_EMOTION_LABEL[affect.tts_emotion] || '语气平稳')}</span>
+        </div>` : ''}
+
         <div class="live-rail-row live-rail-row--depth">
           <span class="live-rail-label">说到哪一步</span>
           <span class="live-rail-value">${escapeHtml(busy ? '—' : affect.depth_label)}</span>
@@ -1367,6 +1832,8 @@ function buildLiveFeedbackRailHtml(messages, patientAffect, opts = {}) {
           </div>
         </div>` : ''}
 
+        ${!busy ? buildEmotionTransitionHtml(messages, patientAffect) : ''}
+
         ${buildCoverageProgressHtml(messages)}
 
         ${affect._lastPatientSnippet && !busy ? `
@@ -1378,28 +1845,56 @@ function buildLiveFeedbackRailHtml(messages, patientAffect, opts = {}) {
 function buildGalVoiceActionsInnerHtml() {
   const v = state.voice;
   return `
-    <label class="gal-voice-switch" title="开/关语音模拟">
+    <label class="gal-voice-switch" title="开启后：受试者回复会朗读；你也可点输入框旁「说话」用语音输入">
       <input type="checkbox" id="voice-toggle" ${v.enabled ? 'checked' : ''} />
       <span class="gal-voice-switch-ui" aria-hidden="true"></span>
-      <span class="gal-voice-switch-text">语音</span>
+      <span class="gal-voice-switch-text">语音模式</span>
     </label>
     ${v.enabled ? `
-      <button type="button" class="gal-action-btn gal-action-btn--ghost ${v.listening ? 'is-hot' : ''}" id="voice-mic-btn" ${(v.speaking || v.processing) ? 'disabled' : ''}>
-        ${v.listening ? '停止说话' : '开始说话'}
-      </button>
-      <button type="button" class="gal-action-btn gal-action-btn--ghost" id="voice-pause-btn" ${v.speaking ? '' : 'disabled'}>暂停</button>
+      <label class="gal-voice-autosend" title="识别结束后自动发送">
+        <input type="checkbox" id="voice-autosend" ${v.autoSend ? 'checked' : ''} />
+        <span>说完发送</span>
+      </label>
+      <button type="button" class="gal-action-btn gal-action-btn--ghost" id="voice-pause-btn" ${v.speaking ? '' : 'disabled'} title="暂停受试者正在播放的语音">暂停旁白</button>
     ` : ''}`;
 }
 
+function buildGalMicButtonHtml() {
+  const v = state.voice;
+  const hot = !!v.listening;
+  const busy = !!(v.speaking || v.processing);
+  return `
+    <button type="button"
+      class="gal-mic-btn ${hot ? 'is-hot' : ''} ${v.enabled ? '' : 'is-off'}"
+      id="voice-mic-btn"
+      title="${hot ? '停止语音输入' : (v.enabled ? '开始语音输入（说完再点停止）' : '点此开启语音模式并开始说话')}"
+      ${busy ? 'disabled' : ''}>
+      ${hot ? '停止' : '说话'}
+    </button>`;
+}
+
 function bindGalVoiceMicPause() {
-  $('#voice-mic-btn')?.addEventListener('click', () => {
+  $('#voice-mic-btn')?.addEventListener('click', async () => {
     if (state.voice.listening) {
       voiceCtrl.stopListening({ commit: true });
-    } else {
-      const input = $('#chat-input');
-      state.voice.inputBase = (input?.value || '').trim();
-      voiceCtrl.startListening();
+      return;
     }
+    if (!state.voice.enabled) {
+      await voiceCtrl.setEnabled(true);
+      patchGalVoiceActions();
+    }
+    if (!state.voice.speechRecognition) {
+      showPracticeAlertModal('语音不可用', '当前浏览器不支持语音识别，请用 Chrome / Edge，并允许麦克风权限。');
+      return;
+    }
+    const input = $('#chat-input');
+    state.voice.inputBase = (input?.value || '').trim();
+    const ok = voiceCtrl.startListening();
+    if (!ok && state.voice.error) {
+      showPracticeAlertModal('语音不可用', state.voice.error);
+    }
+    const statusEl = $('#voice-status-live');
+    if (statusEl) statusEl.textContent = voiceStatusText();
   });
   $('#voice-pause-btn')?.addEventListener('click', () => {
     voiceCtrl.stopPlayback();
@@ -1420,23 +1915,27 @@ function bindGalVoiceControls() {
       }
     };
   }
+  const autosend = $('#voice-autosend');
+  if (autosend) {
+    autosend.onchange = (e) => {
+      state.voice.autoSend = e.target.checked;
+    };
+  }
   bindGalVoiceMicPause();
 }
 
 function patchGalVoiceActions() {
   const slot = document.querySelector('.gal-voice-actions');
-  if (!slot) return;
-  slot.innerHTML = buildGalVoiceActionsInnerHtml();
-  bindGalVoiceMicPause();
-  const toggle = $('#voice-toggle');
-  if (toggle) {
-    toggle.onchange = async (e) => {
-      await voiceCtrl.setEnabled(e.target.checked);
-      patchGalVoiceActions();
-      const statusEl = $('#voice-status-live');
-      if (statusEl) statusEl.textContent = voiceStatusText();
-    };
+  if (slot) {
+    slot.innerHTML = buildGalVoiceActionsInnerHtml();
   }
+  const micSlot = document.querySelector('.gal-mic-slot');
+  if (micSlot) {
+    micSlot.innerHTML = buildGalMicButtonHtml();
+  }
+  bindGalVoiceControls();
+  const statusEl = $('#voice-status-live');
+  if (statusEl) statusEl.textContent = voiceStatusText();
 }
 
 function updateCheckpointFlash(messages) {
@@ -1455,31 +1954,118 @@ function bindLiveRailEvents() {
   /* 受试者状态面板当前无交互控件；保留钩子供后续扩展 */
 }
 
+function patchLeftStackCollapsed() {
+  const open = state.practice.leftStackOpen !== false;
+  const wrap = document.querySelector('.practice-gal-wrap');
+  const stack = document.querySelector('.practice-left-stack');
+  wrap?.classList.toggle('is-left-stack-collapsed', !open);
+  stack?.classList.toggle('is-collapsed', !open);
+  const collapseBtn = $('#practice-left-collapse');
+  if (collapseBtn) {
+    collapseBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    collapseBtn.title = open ? '收起左侧面板' : '展开左侧面板';
+    collapseBtn.textContent = open ? '收起' : '展开';
+  }
+  const toggleBtn = $('#practice-left-toggle');
+  if (toggleBtn) {
+    toggleBtn.classList.toggle('is-active', open);
+    toggleBtn.title = open ? '收起左侧面板' : '展开左侧面板';
+    toggleBtn.textContent = open ? '收起侧栏' : '展开侧栏';
+  }
+  const fab = $('#practice-left-expand-fab');
+  if (fab) fab.hidden = open;
+}
+
+function setLeftStackOpen(open) {
+  state.practice.leftStackOpen = !!open;
+  localStorage.setItem('practiceLeftStackOpen', open ? '1' : '0');
+  patchLeftStackCollapsed();
+}
+
 function patchCheckpointRail() {
-  const open = !!state.practice.checkpointOpen;
   const engagement = state.engagementMode || 'practice';
-  document.querySelector('.practice-gal-wrap')?.classList.toggle('is-checkpoint-open', open);
-  const btn = $('#practice-checkpoint-toggle');
-  if (btn) {
-    btn.textContent = open ? '收起检查点' : '沟通检查点';
-    btn.classList.toggle('is-active', open);
-  }
-  let rail = $('#practice-checkpoint-drawer');
-  if (!open) {
-    rail?.remove();
-    return;
-  }
-  if (engagement !== 'practice') return;
+  if (engagement !== 'practice' && engagement !== 'assessment') return;
+  if (!state.practice.sessionId || state.practice.status === 'completed') return;
   const html = `
     <aside class="practice-checkpoint-rail" id="practice-checkpoint-drawer" aria-label="沟通检查点">
       ${buildCheckpointPanelHtml(state.practice.messages, { engagement })}
     </aside>`;
+  const rail = $('#practice-checkpoint-drawer');
   if (rail) {
     rail.outerHTML = html;
   } else {
-    const mount = $('#digital-human-mount');
-    mount?.insertAdjacentHTML('afterend', html);
+    const stack = document.querySelector('.practice-left-stack');
+    if (stack) stack.insertAdjacentHTML('beforeend', html);
+    else $('#digital-human-mount')?.insertAdjacentHTML('afterend', html);
   }
+  document.querySelector('.practice-gal-wrap')?.classList.add('has-checkpoint-rail', 'is-checkpoint-open');
+}
+
+const GAL_DIALOG_H_KEY = 'aisp.galDialogHeightPx';
+
+function getStoredGalDialogHeight() {
+  try {
+    const n = Number(localStorage.getItem(GAL_DIALOG_H_KEY));
+    return Number.isFinite(n) && n >= 240 ? Math.round(n) : null;
+  } catch {
+    return null;
+  }
+}
+
+function applyGalDialogHeight(glass, heightPx) {
+  if (!glass) return;
+  if (heightPx == null) {
+    glass.style.height = '';
+    glass.style.maxHeight = '';
+    glass.classList.remove('is-user-sized');
+    return;
+  }
+  const clamped = Math.max(240, Math.min(Math.round(window.innerHeight * 0.88), Math.round(heightPx)));
+  glass.style.height = `${clamped}px`;
+  glass.style.maxHeight = `${clamped}px`;
+  glass.classList.add('is-user-sized');
+}
+
+function bindGalDialogResize() {
+  const glass = document.querySelector('.gal-dialog-glass');
+  const handle = $('#gal-dialog-resize');
+  if (!glass || !handle) return;
+  applyGalDialogHeight(glass, getStoredGalDialogHeight());
+  if (handle.dataset.bound === '1') return;
+  handle.dataset.bound = '1';
+
+  let startY = 0;
+  let startH = 0;
+  const onMove = (e) => {
+    const y = e.clientY;
+    const next = startH + (startY - y);
+    applyGalDialogHeight(glass, next);
+  };
+  const onUp = () => {
+    glass.classList.remove('is-resizing');
+    document.removeEventListener('pointermove', onMove);
+    document.removeEventListener('pointerup', onUp);
+    document.removeEventListener('pointercancel', onUp);
+    try {
+      const h = Math.round(glass.getBoundingClientRect().height);
+      localStorage.setItem(GAL_DIALOG_H_KEY, String(h));
+    } catch { /* ignore */ }
+  };
+  handle.addEventListener('pointerdown', (e) => {
+    if (e.button != null && e.button !== 0) return;
+    e.preventDefault();
+    handle.setPointerCapture?.(e.pointerId);
+    startY = e.clientY;
+    startH = glass.getBoundingClientRect().height;
+    glass.classList.add('is-resizing');
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
+    document.addEventListener('pointercancel', onUp);
+  });
+  handle.addEventListener('dblclick', () => {
+    try { localStorage.removeItem(GAL_DIALOG_H_KEY); } catch { /* ignore */ }
+    applyGalDialogHeight(glass, null);
+  });
 }
 
 function patchFeedExpanded() {
@@ -1490,6 +2076,19 @@ function patchFeedExpanded() {
   if (btn) btn.textContent = expanded ? '收起对话框' : '展开全部对话';
   const glass = document.querySelector('.gal-dialog-glass');
   if (glass) glass.classList.toggle('is-feed-expanded', expanded);
+  const meta = document.querySelector('.gal-dialog-feed-meta span');
+  if (meta) {
+    const n = (state.practice.messages || []).filter((m) => m.role !== 'system').length;
+    meta.textContent = expanded
+      ? `对话 ${n} 条 · 已展开，可上滑看更早内容 · 拖顶边调高度`
+      : `对话 ${n} 条 · 上滑可看历史 · 拖顶边可调高度`;
+  }
+  // 展开时滚到顶部，避免只见最后一句误以为「没有历史」
+  requestAnimationFrame(() => {
+    if (!feed) return;
+    if (expanded) feed.scrollTop = 0;
+    else scrollChatFeedToEnd();
+  });
 }
 
 function buildGuideUiMockPractice() {
@@ -1531,28 +2130,166 @@ function buildGuideUiMockFeedback() {
     </div>`;
 }
 
-function renderGuide() {
-  const g = state.guide;
+function resolveGuideAudience() {
+  if (!isAdminUser(state.auth.user)) return 'trainee';
+  const stored = localStorage.getItem('aisp_guide_audience');
+  if (stored === 'trainee' || stored === 'admin') return stored;
+  return 'admin';
+}
+
+function setGuideAudience(audience) {
+  state.guideAudience = audience === 'admin' ? 'admin' : 'trainee';
+  localStorage.setItem('aisp_guide_audience', state.guideAudience);
+}
+
+function renderGuideSections(sections, startNum = 6) {
+  return (sections || []).map((sec, i) => {
+    let body = sec.content ? `<p>${formatText(sec.content)}</p>` : '';
+    if (sec.analogy) {
+      body += `<div class="guide-analogy"><strong>打个比方：</strong>${sec.analogy}</div>`;
+    }
+    if (sec.points) {
+      body += `<ul class="guide-list">${sec.points.map((p) => `<li>${formatText(p)}</li>`).join('')}</ul>`;
+    }
+    if (sec.steps) {
+      body += `<div class="guide-steps">${sec.steps.map((st) => `
+        <div class="guide-step"><strong>${st.label}</strong><span>${st.desc}</span></div>
+      `).join('')}</div>`;
+    }
+    if (sec.rules) {
+      body += `<div class="core-rules">${sec.rules.map((r, j) => `
+        <div class="core-rule">
+          <span class="core-rule-num">${j + 1}</span>
+          <p>${formatText(r)}</p>
+        </div>
+      `).join('')}</div>`;
+    }
+    return `
+      <section class="guide-section">
+        <h3><span class="guide-num">${startNum + i}</span>${escapeHtml(sec.title)}</h3>
+        ${body}
+      </section>`;
+  }).join('');
+}
+
+function renderGuidePageFigures(pages) {
+  return (pages || []).map((pg, i) => `
+    <figure class="guide-figure guide-page-figure">
+      ${pg.image ? `<img src="${escapeHtml(pg.image)}" alt="${escapeHtml(pg.title)}" loading="lazy" decoding="async" />` : ''}
+      <figcaption>
+        <span class="guide-page-nav">${escapeHtml(pg.nav || '')}</span>
+        <strong>${i + 1}. ${escapeHtml(pg.title)}</strong>
+        <p>${escapeHtml(pg.meaning || '')}</p>
+        ${(pg.points || []).length ? `<ul>${pg.points.map((p) => `<li>${formatText(p)}</li>`).join('')}</ul>` : ''}
+      </figcaption>
+    </figure>`).join('');
+}
+
+function renderGuideAudienceTabs(active) {
+  if (!isAdminUser(state.auth.user)) return '';
+  return `
+    <div class="guide-audience-tabs" role="tablist" aria-label="手册类型">
+      <button type="button" class="guide-audience-tab ${active === 'trainee' ? 'is-active' : ''}" data-guide-audience="trainee" role="tab">
+        学员端手册
+      </button>
+      <button type="button" class="guide-audience-tab ${active === 'admin' ? 'is-active' : ''}" data-guide-audience="admin" role="tab">
+        管理端手册
+      </button>
+    </div>`;
+}
+
+function bindGuideActions(rootEl) {
+  rootEl.querySelectorAll('[data-goto]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const target = btn.dataset.goto;
+      if (btn.hasAttribute('data-mark-guide-done')) markGuideCompleted();
+      if (target.startsWith('explain-')) {
+        // 学员端不进「系统功能」展示页；评分说明落在手册检查点
+        if (!isAdminUser(state.auth.user)) {
+          navigate('guide');
+          requestAnimationFrame(() => {
+            document.getElementById('guide-checkpoints')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          });
+          return;
+        }
+        navigate('explain', target.slice(8));
+        return;
+      }
+      navigate(target);
+    });
+  });
+  rootEl.querySelectorAll('[data-guide-audience]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      setGuideAudience(btn.dataset.guideAudience);
+      renderGuide();
+    });
+  });
+  rootEl.querySelectorAll('[data-guide-scroll]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const key = btn.dataset.guideScroll;
+      const el = key === 'checkpoints'
+        ? document.getElementById('guide-checkpoints')
+        : document.getElementById(key);
+      el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  });
+}
+
+function renderTraineeGuide(g) {
   const theme = g.theme || {};
+  const scenarios = g.scenarios || [];
+  const expressions = g.expressions || [];
+  const modes = g.modes || theme.modes || [];
   const icCheckpoints = buildCheckpointDefsForScene('informed_consent');
   const fuCheckpoints = buildCheckpointDefsForScene('follow_up');
+  const isNewbie = getUserProficiency() === 'newbie';
 
-  setPage('使用手册', '先看清练完要达成什么，再进入模拟练习');
-
-  viewEl.innerHTML = `
+  return `
+    ${renderGuideAudienceTabs('trainee')}
     <div class="guide-hero manual-hero guide-theme-hero">
-      <p class="hero-eyebrow">Clinical Trial Communication Simulator</p>
+      <p class="hero-eyebrow">Clinical Trial Communication Simulator · 学员端</p>
       <h3>${escapeHtml(theme.headline || g.title)}</h3>
       <p>${escapeHtml(theme.subline || '')}</p>
+      ${isNewbie ? `
+        <p class="guide-proficiency-banner">你是<strong>新手</strong>（对话未满 ${UX_VETERAN_SESSIONS} 场或练习时长未满 ${Math.round(UX_VETERAN_DURATION_MS / 60000)} 分钟）。请先看完手册再开练；左侧进度条会显示距<strong>老手</strong>还差多少。达标后登录将直达模拟对话。</p>
+      ` : `
+        <p class="guide-proficiency-banner is-regular">你已是<strong>老手</strong>：日常开练请进「模拟对话」；手册可随时查阅。</p>
+      `}
     </div>
 
-    <section class="guide-section guide-goal-section">
-      <h3><span class="guide-num">★</span>${escapeHtml(theme.goalTitle || '练完要达成什么')}</h3>
-      <ul class="guide-list guide-goal-list">
-        ${(theme.goals || []).map((p) => `<li>${formatText(p)}</li>`).join('')}
-      </ul>
+    <section class="guide-section">
+      <h3><span class="guide-num">①</span>先认页面（左侧导航地图）</h3>
+      <p>打开系统后，左侧菜单就是产品地图。建议按下面顺序认识，再开始练习。</p>
+      <div class="guide-nav-map">
+        ${[
+          ['使用手册', '你正在这里：认页面、认场景'],
+          ['模拟对话', '主战场：选人 → 看档案 → 开练'],
+          ['对话记录', '找回历史会话，继续或回看'],
+          ['练习反馈', '对照清单与参考分复盘'],
+          ['病例详情资料', '备考资料库，不是开练入口'],
+        ].map(([name, desc]) => `
+          <div class="guide-nav-map-item">
+            <strong>${name}</strong>
+            <span>${desc}</span>
+          </div>`).join('')}
+      </div>
+      <div class="guide-page-stack">${renderGuidePageFigures(g.pages)}</div>
+    </section>
+
+    <section class="guide-section">
+      <h3><span class="guide-num">②</span>业务场景：你在练什么局</h3>
+      <p>同一套界面，会落到两种真实业务沟通。开练档案右卡的「练习任务」会随场景切换。</p>
+      <div class="guide-scenario-grid">
+        ${scenarios.map((sc) => `
+          <article class="guide-scenario-card">
+            <strong>${escapeHtml(sc.title)}</strong>
+            <p>${escapeHtml(sc.summary || '')}</p>
+            ${sc.who ? `<p class="guide-scenario-who"><em>典型受试者：</em>${escapeHtml(sc.who)}</p>` : ''}
+            ${(sc.focus || []).length ? `<ul class="guide-list">${sc.focus.map((f) => `<li>${formatText(f)}</li>`).join('')}</ul>` : ''}
+          </article>`).join('')}
+      </div>
       <div class="guide-mode-cards">
-        ${(theme.modes || []).map((m) => `
+        ${modes.map((m) => `
           <div class="guide-mode-card">
             <strong>${escapeHtml(m.label)}</strong>
             <p>${escapeHtml(m.desc)}</p>
@@ -1560,8 +2297,26 @@ function renderGuide() {
       </div>
     </section>
 
-    <section class="guide-section guide-checkpoint-section">
-      <h3><span class="guide-num">①</span>${escapeHtml(g.checkpointIntro?.title || '沟通检查点')}</h3>
+    <section class="guide-section">
+      <h3><span class="guide-num">③</span>这些页面在表达什么</h3>
+      <div class="guide-express-list">
+        ${expressions.map((ex) => `
+          <div class="guide-express-item">
+            <strong>${escapeHtml(ex.title)}</strong>
+            <p>${formatText(ex.content)}</p>
+          </div>`).join('')}
+      </div>
+    </section>
+
+    <section class="guide-section guide-goal-section">
+      <h3><span class="guide-num">④</span>${escapeHtml(theme.goalTitle || '练完要达成什么')}</h3>
+      <ul class="guide-list guide-goal-list">
+        ${(theme.goals || []).map((p) => `<li>${formatText(p)}</li>`).join('')}
+      </ul>
+    </section>
+
+    <section class="guide-section guide-checkpoint-section" id="guide-checkpoints">
+      <h3><span class="guide-num">⑤</span>${escapeHtml(g.checkpointIntro?.title || '沟通检查点')}</h3>
       <p>${formatText(g.checkpointIntro?.content || '')}</p>
       <div class="guide-checkpoint-tabs">
         <div class="guide-checkpoint-col">
@@ -1574,7 +2329,7 @@ function renderGuide() {
           </ol>
         </div>
         <div class="guide-checkpoint-col">
-          <h4>随访沟通 · ${fuCheckpoints.length} 项（+2 红线）</h4>
+          <h4>随访沟通 · ${fuCheckpoints.length} 项</h4>
           <ol class="guide-checkpoint-list">
             ${fuCheckpoints.map((c, i) => `
               <li><span class="guide-cp-num">${i + 1}</span>
@@ -1585,86 +2340,113 @@ function renderGuide() {
       </div>
     </section>
 
-    <section class="guide-section guide-figures-section">
-      <h3><span class="guide-num">②</span>界面长什么样？（示意 · 非截图）</h3>
-      <p>为避免旧截图与当前界面不一致，下面用<strong>示意图</strong>标注各区域作用。强刷页面后应以实际界面为准。</p>
-      <div class="guide-figure-grid">
-        <figure class="guide-figure">
-          ${buildGuideUiMockPractice()}
-          <figcaption><strong>模拟对话（练习模式）</strong> · 左上<strong>实时沟通反馈</strong>（心情、信任、进度）；中间受试者形象；右上可展开完整检查点；下方输入对话。</figcaption>
-        </figure>
-        <figure class="guide-figure">
-          ${buildGuideUiMockFeedback()}
-          <figcaption><strong>练习反馈</strong> · 总览用<strong>环形图</strong>看总分、<strong>圆环</strong>看检查项占比；维度页有<strong>雷达图</strong>和各维度<strong>环形卡片</strong>。</figcaption>
-        </figure>
-      </div>
-      <ol class="guide-walk-list">
-        <li><strong>使用手册</strong> → 看清目标和检查点</li>
-        <li><strong>模拟对话</strong> → 选张大爷 → 开始练习 → 看左侧实时反馈调整话术</li>
-        <li><strong>结束练习</strong> → <strong>练习反馈</strong> 查看分项建议</li>
-      </ol>
-    </section>
+    ${renderGuideSections(g.sections, 6)}
 
-    <section class="guide-section guide-script-section">
-      <h3><span class="guide-num">③</span>示范话术：怎么练出场景设计</h3>
-      <p>完整版见 <code>PRD2.0/07-示范话术.md</code>。下面两段可直接复制改着说。</p>
-      <div class="guide-script-cards">
-        <div class="guide-script-card">
-          <strong>张大爷 · 被问「能不能中途不参加」</strong>
-          <blockquote>完全可以。这是自愿的，您随时说不参加或中途退出都可以，<em>不影响</em>您平时在这家医院看病。</blockquote>
-          <p class="card-meta">→ 检查点「自愿退出」可能变绿；左侧实时反馈会显示「信任感：还在观望 → 比较放心」。</p>
-        </div>
-        <div class="guide-script-card">
-          <strong>李建国 · 被问「耽误跑车吗」</strong>
-          <blockquote>理解您时间紧。筛选大约 2 小时，入组后前 4 周每 2 周来一次，每次 1 小时内，可约您收车后的时段。</blockquote>
-          <p class="card-meta">→ 命中「流程与随访」；信任升高后他才会细问风险和疗效。</p>
-        </div>
-      </div>
-    </section>
-
-    ${g.sections.map((sec, i) => {
-      let body = sec.content ? `<p>${formatText(sec.content)}</p>` : '';
-      if (sec.analogy) {
-        body += `<div class="guide-analogy"><strong>打个比方：</strong>${sec.analogy}</div>`;
-      }
-      if (sec.points) {
-        body += `<ul class="guide-list">${sec.points.map((p) => `<li>${formatText(p)}</li>`).join('')}</ul>`;
-      }
-      if (sec.steps) {
-        body += `<div class="guide-steps">${sec.steps.map((st) => `
-          <div class="guide-step"><strong>${st.label}</strong><span>${st.desc}</span></div>
-        `).join('')}</div>`;
-      }
-      if (sec.rules) {
-        body += `<div class="core-rules">${sec.rules.map((r, j) => `
-          <div class="core-rule">
-            <span class="core-rule-num">${j + 1}</span>
-            <p>${formatText(r)}</p>
-          </div>
-        `).join('')}</div>`;
-      }
-      return `
-        <section class="guide-section">
-          <h3><span class="guide-num">${i + 4}</span>${sec.title}</h3>
-          ${body}
-        </section>`;
-    }).join('')}
     <div class="guide-cta">
-      <button type="button" data-goto="practice">开始：模拟对话练习</button>
-      <button type="button" class="secondary" data-goto="explain-rubric">查看评分说明</button>
-    </div>
-  `;
+      <button type="button" data-goto="practice" data-mark-guide-done>已了解，开始模拟对话</button>
+      <button type="button" class="secondary" data-guide-scroll="checkpoints">先看沟通检查点</button>
+    </div>`;
+}
 
-  viewEl.querySelectorAll('[data-goto]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const target = btn.dataset.goto;
-      if (target.startsWith('explain-')) {
-        navigate('explain', target.slice(8));
-        return;
-      }
-      navigate(target);
-    });
-  });
+function renderAdminGuide(ag) {
+  const theme = ag.theme || {};
+  const workflows = ag.workflows || [];
+  const expressions = ag.expressions || [];
+  const draftStatuses = ag.draftStatuses || [];
+
+  return `
+    ${renderGuideAudienceTabs('admin')}
+    <div class="guide-hero manual-hero guide-theme-hero guide-theme-hero--admin">
+      <p class="hero-eyebrow">Admin Console · 管理端</p>
+      <h3>${escapeHtml(theme.headline || ag.title)}</h3>
+      <p>${escapeHtml(theme.subline || '')}</p>
+    </div>
+
+    <section class="guide-section">
+      <h3><span class="guide-num">①</span>管理端导航地图</h3>
+      <p>管理员登录后，左侧在学员入口之下还有管理区。日常加病例请进「病例与场景」。</p>
+      <div class="guide-nav-map guide-nav-map--admin">
+        ${(ag.navMap || []).map(([name, desc]) => `
+          <div class="guide-nav-map-item">
+            <strong>${escapeHtml(name)}</strong>
+            <span>${escapeHtml(desc)}</span>
+          </div>`).join('')}
+      </div>
+      <div class="guide-page-stack">${renderGuidePageFigures(ag.pages)}</div>
+    </section>
+
+    <section class="guide-section">
+      <h3><span class="guide-num">②</span>三种添加路径（最后都进同一审核页）</h3>
+      <p>本期只能挂 <strong>知情同意</strong> 或 <strong>随访（询问）</strong>。选错场景会导致学员练错清单。</p>
+      <div class="guide-workflow-grid">
+        ${workflows.map((wf) => `
+          <article class="guide-workflow-card">
+            <strong>${escapeHtml(wf.title)}</strong>
+            <div class="guide-steps">
+              ${(wf.steps || []).map((st) => `
+                <div class="guide-step"><strong>${escapeHtml(st.label)}</strong><span>${escapeHtml(st.desc)}</span></div>
+              `).join('')}
+            </div>
+          </article>`).join('')}
+      </div>
+    </section>
+
+    <section class="guide-section">
+      <h3><span class="guide-num">③</span>草稿箱状态说明</h3>
+      <div class="guide-draft-status-grid">
+        ${draftStatuses.map((ds) => `
+          <div class="guide-draft-status">
+            <span class="status-pill ${ds.status === 'published' ? 'ok' : 'warn'}">${escapeHtml(ds.label)}</span>
+            <p>${escapeHtml(ds.desc || '')}</p>
+          </div>`).join('')}
+      </div>
+    </section>
+
+    <section class="guide-section">
+      <h3><span class="guide-num">④</span>常见问题（管理端）</h3>
+      <div class="guide-express-list">
+        ${expressions.map((ex) => `
+          <div class="guide-express-item">
+            <strong>${escapeHtml(ex.title)}</strong>
+            <p>${formatText(ex.content)}</p>
+          </div>`).join('')}
+      </div>
+    </section>
+
+    <section class="guide-section guide-goal-section">
+      <h3><span class="guide-num">⑤</span>${escapeHtml(theme.goalTitle || '管理端职责')}</h3>
+      <ul class="guide-list guide-goal-list">
+        ${(theme.goals || []).map((p) => `<li>${formatText(p)}</li>`).join('')}
+      </ul>
+    </section>
+
+    ${renderGuideSections(ag.sections, 6)}
+
+    <div class="guide-cta">
+      <button type="button" data-goto="admin-cases">去添加病例</button>
+      <button type="button" class="secondary" data-goto="admin-users">账号管理</button>
+    </div>`;
+}
+
+function renderGuide() {
+  const g = state.guide;
+  if (!g) {
+    setPage('使用手册', '加载中…');
+    viewEl.innerHTML = '<div class="empty"><p>正在加载使用手册…</p></div>';
+    return;
+  }
+
+  const audience = resolveGuideAudience();
+  state.guideAudience = audience;
+  const isAdminGuide = audience === 'admin' && g.admin;
+  setPage('使用手册', isAdminGuide
+    ? '病例接入、审核发布与账号管理'
+    : (getUserProficiency() === 'newbie'
+      ? '新手：先认清页面与检查点，再去模拟对话'
+      : '熟手也可随时查阅；日常开练请进模拟对话'));
+
+  viewEl.innerHTML = isAdminGuide ? renderAdminGuide(g.admin) : renderTraineeGuide(g);
+  bindGuideActions(viewEl);
 }
 
 async function fetchDbVerify() {
@@ -1862,49 +2644,143 @@ async function runDbAction(kind) {
 }
 
 function buildOverviewHtml() {
-  const stds = state.standards.standards;
-  const mvpItems = state.rubric.items.filter((i) => i.enabledMvp);
-  const l1 = mvpItems.filter((i) => i.layer === 'L1').length;
-  const primary = stds.filter((s) => s.priority === 'primary').length;
+  const stds = state.standards?.standards || [];
+  const mvpItems = (state.rubric?.items || []).filter((i) => i.enabledMvp);
+  const fuItems = (state.rubricFollowup?.items || []).filter((i) => i.enabledMvp);
+  const diseases = state.casesIndex?.diseases || [];
+  const casesN = diseases.reduce((n, d) => n + ((d.cases || []).length), 0);
+  const scenesLive = (state.scenes?.scenes || []).filter((s) => s.status === 'mvp' || s.status === 'beta');
 
   return `
+    <div class="explain-box" style="margin-bottom:20px">
+      <div class="explain-box-label">现在这套系统在练什么</div>
+      <p>学员与 <strong>AI 受试者</strong>做知情同意 / 随访沟通；结束后看<strong>规范清单</strong>（主）和<strong>练习参考分 0–100</strong>（辅）。语音、Live2D、情绪旁白是增强项，可关。</p>
+    </div>
+
     <div class="stats-grid">
-      ${statCard(stds.length, '纳入标准', '#0f766e', '<path d="M4 6h16v12H4z"/><path d="M8 10h8M8 14h5"/>')}
-      ${statCard(primary, '主依据标准', '#2563eb', '<path d="M12 2l3 7h7l-5.5 4 2 7L12 17l-6.5 3 2-7L2 9h7z"/>')}
-      ${statCard(mvpItems.length, 'MVP 评分项', '#7c3aed', '<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>')}
-      ${statCard(l1, 'L1 硬性条目', '#dc2626', '<path d="M12 9v4M12 17h.01"/><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>')}
+      ${statCard(scenesLive.length, '已启用场景', '#0f766e', '<path d="M4 6h16v12H4z"/><path d="M8 10h8M8 14h5"/>')}
+      ${statCard(mvpItems.length + fuItems.length, '评分检查项', '#2563eb', '<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>')}
+      ${statCard(stds.length, '纳入标准', '#7c3aed', '<path d="M12 2l3 7h7l-5.5 4 2 7L12 17l-6.5 3 2-7L2 9h7z"/>')}
+      ${statCard(casesN || '—', '试验病例', '#d97706', '<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>')}
     </div>
 
     <div class="section-head">
-      <h3 class="section-title">双底座架构</h3>
-      <span class="section-sub">训练价值 = 评得对 + 病人演得对</span>
+      <h3 class="section-title">学员主路径</h3>
+      <span class="section-sub">手册 → 选人 → 对话 → 结束 → 反馈</span>
     </div>
     <div class="arch-grid">
       <div class="arch-block">
-        <h4>底座 A · 标准与评分</h4>
+        <h4>练习模式</h4>
         <ul>
-          <li>标准资料库（${stds.length} 项注册）</li>
-          <li>评分对照表（S1 知情同意 · ${mvpItems.length} 条 MVP）</li>
-          <li>术语表（${state.terms.terms.length} 项）</li>
+          <li>可多次新建对话，历史评分保留</li>
+          <li>可开参考模式查阅病例摘要</li>
+          <li>侧栏可见心情 / 进度（练习）</li>
         </ul>
       </div>
       <div class="arch-block">
-        <h4>底座 B · 病例症状事实</h4>
+        <h4>考核模式</h4>
         <ul>
-          <li>${state.casePackage ? `已入库：${state.casePackage.meta.short_title}` : '待病例资料入库'}</li>
-          <li>状态：${state.casePackage?.meta.data_status || '—'} · v${state.casePackage?.meta.version || '—'}</li>
-          <li>核心症状 ${state.casePackage?.symptoms?.filter((s) => s.is_core && s.present).length || 0} 条（占位可替换）</li>
+          <li>严格模式，不宜开参考</li>
+          <li>同受试者同时仅一场进行中</li>
+          <li>结束后可「重新考核」新开一场</li>
         </ul>
       </div>
-      <div class="flow-banner">进入案例 → 沟通 → 关键问题 → 完成 → 反馈</div>
+      <div class="arch-block">
+        <h4>反馈怎么读</h4>
+        <ul>
+          <li>先看清单大类 pass / fail</li>
+          <li>再看练习参考分与维度</li>
+          <li>红线项 fail → 综合未达标</li>
+        </ul>
+      </div>
+      <div class="flow-banner">选受试者 → 模拟对话 → 结束练习 → 练习反馈 →（可选）再练一次</div>
     </div>
 
     <div class="section-head">
-      <h3 class="section-title">主依据标准</h3>
-      <span class="section-sub">点击查看详情与官方链接</span>
+      <h3 class="section-title">两套底座</h3>
+      <span class="section-sub">评得对 + 演得对</span>
     </div>
-    <div class="cards-grid">
-      ${stds.filter((s) => s.priority === 'primary').map((s) => renderStandardCard(s)).join('')}
+    <div class="arch-grid">
+      <div class="arch-block">
+        <h4>标准与评分</h4>
+        <ul>
+          <li>标准资料库（${stds.length} 项）</li>
+          <li>知情同意清单 ${mvpItems.length} 条 · 随访清单 ${fuItems.length} 条</li>
+          <li>术语统一叫法（见「术语表」）</li>
+        </ul>
+      </div>
+      <div class="arch-block">
+        <h4>病例与受试者</h4>
+        <ul>
+          <li>病种 → 试验 → 受试者三级资料</li>
+          <li>AI 只能基于病例事实说话</li>
+          <li>管理端「病例与场景」可导入维护</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="guide-cta" style="margin-top:8px">
+      <button type="button" data-goto="practice">去模拟对话</button>
+      <button type="button" class="secondary" data-section="practice">下一步：练习与考核说明</button>
+    </div>
+  `;
+}
+
+function buildPracticeGuideHtml() {
+  return `
+    <div class="explain-box" style="margin-bottom:20px">
+      <div class="explain-box-label">对话页在干什么</div>
+      <p>你扮演研究者，对面是 AI 受试者。系统按<strong>场景 + 人设 + 情绪状态</strong>约束回复；结束时对照清单评分。语音朗读可关，纯文字也能完整练。</p>
+    </div>
+
+    <div class="scoring-guide-grid">
+      <div class="arch-block">
+        <h4>开始与继续</h4>
+        <ul class="guide-list compact">
+          <li>先选受试者（如李建国、张大爷）</li>
+          <li>「继续刚才的对话」= 当前受试者最近一场<strong>未结束</strong>练习</li>
+          <li>「开始新练习 / 重新考核」= <strong>新建</strong>一场，旧评分保留</li>
+        </ul>
+      </div>
+      <div class="arch-block">
+        <h4>情绪与语音</h4>
+        <ul class="guide-list compact">
+          <li>责备 / 安抚会影响对方配合度与话术长短</li>
+          <li>语音模式开：旁白可按心情调语速、音量、句间停顿</li>
+          <li>关语音：不影响评分与进度</li>
+        </ul>
+      </div>
+      <div class="arch-block">
+        <h4>结束与反馈</h4>
+        <ul class="guide-list compact">
+          <li>至少说一轮才能结束</li>
+          <li>结束时弹窗生成反馈（可能几十秒）</li>
+          <li>「练习反馈」「对话记录」可复盘历史</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="section-head">
+      <h3 class="section-title">练习 vs 考核</h3>
+    </div>
+    <div class="table-wrap">
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th></th><th>练习</th><th>考核</th></tr></thead>
+          <tbody>
+            <tr><td>目的</td><td>熟悉话术与清单</td><td>检验沟通表现</td></tr>
+            <tr><td>参考资料</td><td>可开「参考模式」</td><td>严格模式，建议不开</td></tr>
+            <tr><td>心情侧栏</td><td>可显示</td><td>建议弱化干扰</td></tr>
+            <tr><td>并行场次</td><td>可多场未结束</td><td>同受试者仅一场进行中</td></tr>
+            <tr><td>再来一次</td><td>新建对话，保留旧分</td><td>重新考核 = 新开一场</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="guide-cta" style="margin-top:16px">
+      <button type="button" data-goto="guide">看使用手册</button>
+      <button type="button" class="secondary" data-section="rubric">下一步：评分说明</button>
     </div>
   `;
 }
@@ -2067,7 +2943,7 @@ function buildScoringGuideHtml() {
     <div class="scoring-guide">
       <div class="explain-box scoring-guide-hero">
         <div class="explain-box-label">练习参考分 · 0–100</div>
-        <p>每次练习结束，系统会给出 <strong>练习参考分 X/100</strong>（非正式能力认证）。同时显示维度拆分、清单线是否通过，以及每条检查项的 pass / uncertain / fail。</p>
+        <p>反馈<strong>先看规范清单</strong>（各检查项达标/未达标，按大类折叠）。同时给出 <strong>练习参考分 X/100</strong> 作为教学汇总（非正式认证、非问卷赋分）。并显示维度拆分与清单线。</p>
       </div>
 
       <div class="scoring-guide-grid">
@@ -2415,6 +3291,7 @@ const PERSONA_LABELS = {
   with_spouse: '与配偶同住',
   lives_alone: '独居',
   with_family: '与家人同住',
+  with_adult_child: '与成年子女同住',
   secondary: '中学文化程度',
   primary: '小学文化程度',
   college: '大专及以上',
@@ -2422,18 +3299,67 @@ const PERSONA_LABELS = {
   anxious: '焦虑',
   calm: '情绪较平稳',
   repeats_key_questions: '关键问题会再问一遍，需要说慢一点',
+  needs_slow_and_repeat: '需要放慢语速、重复确认',
   mostly_adherent: '大体能按时服药，偶有漏服',
+  sometimes_forgets: '偶有漏服或忘记',
   adherent: '服药依从较好',
   average: '理解力一般',
   low: '较少隐瞒病情',
+  medium: '关键点可能含糊',
   high: '可能有所隐瞒',
   normal: '听力正常',
+  mild_loss: '听力略差',
   spouse_may_attend: '配偶可能会一起听',
+  daughter_often_present: '女儿常陪同',
   self: '本人可以签字',
+  self_with_witness: '本人签字（可有见证人）',
+  retired: '退休',
+  taxi_driver: '出租车司机',
 };
+
+const PERSONA_PORTRAIT_URLS = {
+  'PER-HTN-TAXI-01': '/live2d/portraits/PER-HTN-TAXI-01.webp',
+  'PER-ELDER-BASIC-01': '/live2d/portraits/PER-ELDER-BASIC-01.webp',
+  'PER-ELDER-FEMALE-02': '/live2d/portraits/PER-ELDER-FEMALE-02.webp',
+};
+
+function personaPortraitUrl(personaId) {
+  if (!personaId) return PERSONA_PORTRAIT_URLS['PER-ELDER-BASIC-01'];
+  return PERSONA_PORTRAIT_URLS[personaId]
+    || `/live2d/portraits/${personaId}.webp`;
+}
 
 function isPersonaTrainable(persona) {
   return Boolean(persona?.file && persona?.is_trainable !== false);
+}
+
+const PRACTICE_SCENE_GROUPS = {
+  informed_consent: { label: '知情同意', order: 1 },
+  follow_up: { label: '随访（询问）', order: 2 },
+  adherence: { label: '依从性沟通', order: 3 },
+  other: { label: '其他场景', order: 9 },
+};
+
+function resolveCaseSceneKey(caseId, caseEntry) {
+  const pkg = state.casePackages?.[caseId];
+  const fromPkg = pkg?.session_script?.scene_key;
+  if (fromPkg) {
+    // 白名单场景进固定分组；测试/新场景保留原 key，归入「其他」展示
+    if (PRACTICE_SCENE_GROUPS[fromPkg]) return fromPkg;
+    return fromPkg;
+  }
+  const codes = caseEntry?.mvp_scenes || [];
+  if (codes.includes('S1')) return 'informed_consent';
+  if (codes.includes('S5') || codes.includes('S4')) return 'follow_up';
+  const primary = caseEntry?.primary_scene;
+  if (primary && PRACTICE_SCENE_GROUPS[primary]) return primary;
+  return 'other';
+}
+
+function sceneGroupLabel(sceneKey) {
+  if (PRACTICE_SCENE_GROUPS[sceneKey]?.label) return PRACTICE_SCENE_GROUPS[sceneKey].label;
+  if (!sceneKey || sceneKey === 'other') return '其他场景';
+  return sceneKey;
 }
 
 function flattenAllPersonas() {
@@ -2441,19 +3367,32 @@ function flattenAllPersonas() {
   const items = [];
   hierarchy.forEach((d) => {
     (d.cases || []).forEach((c) => {
+      const sceneKey = resolveCaseSceneKey(c.case_id, c);
+      const pkg = state.casePackages?.[c.case_id];
+      const sceneLabel = pkg?.session_script?.scene_label
+        || sceneGroupLabel(sceneKey);
       (c.personas || []).forEach((p) => {
         items.push({
           diseaseCode: d.disease_code,
           diseaseName: d.name_zh,
           caseId: c.case_id,
+          caseEntry: c,
           caseTitle: c.short_title || c.title || c.case_id,
-          sceneLabel: (c.mvp_scenes || []).join('、') || '—',
+          sceneKey,
+          sceneLabel,
           persona: p,
           trainable: isPersonaTrainable(p),
-          hay: `${d.name_zh} ${c.short_title} ${c.title} ${c.case_id} ${p.display_label} ${p.one_liner}`.toLowerCase(),
+          imported: d.disease_code === 'CUSTOM' || c.data_status === 'imported',
+          hay: `${sceneLabel} ${d.name_zh} ${c.short_title} ${c.title} ${c.case_id} ${p.display_label} ${p.display_name || ''} ${p.one_liner}`.toLowerCase(),
         });
       });
     });
+  });
+  items.sort((a, b) => {
+    const oa = PRACTICE_SCENE_GROUPS[a.sceneKey]?.order ?? 9;
+    const ob = PRACTICE_SCENE_GROUPS[b.sceneKey]?.order ?? 9;
+    if (oa !== ob) return oa - ob;
+    return Number(b.imported) - Number(a.imported);
   });
   return items;
 }
@@ -2476,7 +3415,11 @@ function syncSelectionFromCase(caseId, personaId) {
 
 function buildPracticePersonaPickerHtml() {
   const q = (state.practicePickerSearch || '').trim().toLowerCase();
-  const items = flattenAllPersonas().filter((it) => !q || it.hay.includes(q));
+  const sceneFilter = state.practicePickerScene || 'all';
+  let items = flattenAllPersonas().filter((it) => !q || it.hay.includes(q));
+  if (sceneFilter !== 'all') {
+    items = items.filter((it) => it.sceneKey === sceneFilter);
+  }
   const trainable = items.filter((it) => it.trainable);
   const pending = items.filter((it) => !it.trainable);
 
@@ -2491,14 +3434,47 @@ function buildPracticePersonaPickerHtml() {
         data-pick-disease="${it.diseaseCode}"
         ${disabled ? 'disabled' : ''}>
         <div class="practice-persona-card-top">
+          <span class="practice-persona-card-avatar">
+            <img src="${escapeHtml(personaPortraitUrl(p.persona_id))}" alt="" width="40" height="40" loading="lazy" decoding="async" data-portrait-fallback="/static${escapeHtml(personaPortraitUrl(p.persona_id))}" onerror="if(this.dataset.tried){this.hidden=true;}else{this.dataset.tried='1';this.src=this.dataset.portraitFallback;}" />
+          </span>
           <strong>${escapeHtml(p.display_label || p.persona_id)}</strong>
           ${disabled ? '<span class="status-pill warn">待录入</span>' : '<span class="status-pill ok">可练习</span>'}
         </div>
-        <p class="practice-persona-card-meta">${escapeHtml(it.diseaseName)} · ${escapeHtml(it.caseTitle)}</p>
+        <p class="practice-persona-card-meta">${escapeHtml(it.sceneLabel)} · ${escapeHtml(it.diseaseName)}</p>
         <p class="practice-persona-card-oneline">${escapeHtml(p.one_liner || '—')}</p>
         ${disabled ? '<p class="practice-persona-card-note">资料尚未录入，暂不可对话</p>' : ''}
       </button>`;
   };
+
+  const renderGrouped = (list, pendingSection) => {
+    if (!list.length) return pendingSection ? '' : '<p class="card-meta">没有匹配的受试者，试试换场景或搜索词。</p>';
+    const byScene = new Map();
+    list.forEach((it) => {
+      const key = it.sceneKey || 'other';
+      if (!byScene.has(key)) byScene.set(key, []);
+      byScene.get(key).push(it);
+    });
+    const keys = [...byScene.keys()].sort(
+      (a, b) => (PRACTICE_SCENE_GROUPS[a]?.order ?? 9) - (PRACTICE_SCENE_GROUPS[b]?.order ?? 9),
+    );
+    return keys.map((sk) => {
+      const group = byScene.get(sk) || [];
+      return `
+        <div class="practice-picker-scene-group">
+          <div class="section-head practice-picker-scene-head">
+            <h4 class="section-title">${escapeHtml(sceneGroupLabel(sk))}</h4>
+            <span class="practice-picker-scene-count">${group.length} 人</span>
+          </div>
+          <div class="practice-persona-grid">${group.map(renderCard).join('')}</div>
+        </div>`;
+    }).join('');
+  };
+
+  const sceneTabs = [
+    { id: 'all', label: '全部' },
+    { id: 'informed_consent', label: '知情同意' },
+    { id: 'follow_up', label: '随访（询问）' },
+  ];
 
   return `
     <div class="practice-picker">
@@ -2506,20 +3482,33 @@ function buildPracticePersonaPickerHtml() {
         <button type="button" class="practice-action-btn" id="practice-picker-back">← 返回</button>
         <div>
           <h3>选择受试者</h3>
-          <p>在模拟对话内直接选人开练，无需跳转资料库。占位受试者暂不可对话。</p>
+          <p>按场景分组；可搜人物姓名或病种。人数多了可在此区域内滚动。</p>
         </div>
       </div>
-      <div class="practice-picker-search">
-        <input type="search" id="practice-picker-search" placeholder="搜索病种 / 试验 / 受试者…" value="${escapeHtml(state.practicePickerSearch || '')}" />
+      <div class="practice-picker-toolbar">
+        <div class="practice-picker-scene-tabs">
+          ${sceneTabs.map((t) => `
+            <button type="button" class="practice-scene-tab ${sceneFilter === t.id ? 'is-active' : ''}" data-practice-scene="${t.id}">
+              ${escapeHtml(t.label)}
+            </button>`).join('')}
+        </div>
+        <div class="practice-picker-search">
+          <input type="search" id="practice-picker-search" placeholder="搜索人物 / 场景 / 病种 / 试验…" value="${escapeHtml(state.practicePickerSearch || '')}" />
+        </div>
       </div>
-      ${trainable.length ? `
-        <div class="section-head"><h4 class="section-title">可练习（${trainable.length}）</h4></div>
-        <div class="practice-persona-grid">${trainable.map(renderCard).join('')}</div>
-      ` : '<p class="card-meta">暂无可用受试者，请稍后再试。</p>'}
-      ${pending.length ? `
-        <div class="section-head"><h4 class="section-title">待录入（${pending.length}）</h4></div>
-        <div class="practice-persona-grid">${pending.map(renderCard).join('')}</div>
-      ` : ''}
+      <div class="practice-picker-body">
+        ${trainable.length || pending.length ? '' : '<p class="card-meta">暂无可用受试者，请稍后再试。</p>'}
+        ${trainable.length ? `
+          <div class="practice-picker-section">
+            <div class="section-head"><h4 class="section-title">可练习（${trainable.length}）</h4></div>
+            ${sceneFilter === 'all' ? renderGrouped(trainable) : `<div class="practice-persona-grid">${trainable.map(renderCard).join('')}</div>`}
+          </div>` : (pending.length ? '' : '')}
+        ${pending.length ? `
+          <div class="practice-picker-section">
+            <div class="section-head"><h4 class="section-title">待录入（${pending.length}）</h4></div>
+            ${sceneFilter === 'all' ? renderGrouped(pending, true) : `<div class="practice-persona-grid">${pending.map(renderCard).join('')}</div>`}
+          </div>` : ''}
+      </div>
     </div>`;
 }
 
@@ -2569,6 +3558,14 @@ function sessionMatchesSelection(session) {
   const persona = getSelectedPersona();
   if (!persona?.persona_id || !caseId) return false;
   return session.case_code === caseId && session.persona_code === persona.persona_id;
+}
+
+/** 当前受试者 + 当前练习/考核模式下，最近一场未结束会话 */
+function latestInProgressForSelection() {
+  const list = sessionsForEngagement(state.practiceHistory || [])
+    .filter((s) => s.status === 'in_progress' && sessionMatchesSelection(s));
+  list.sort((a, b) => String(b.started_at || '').localeCompare(String(a.started_at || '')));
+  return list[0] || null;
 }
 
 function sessionModeLabel(mode) {
@@ -2626,6 +3623,9 @@ async function loadAllSessions() {
     const { res, data } = await fetchApi(`${API_BASE}/api/sessions/history?limit=100`);
     if (res.ok) {
       state.practiceHistory = data.sessions || [];
+      syncUxFromHistory(state.practiceHistory);
+      renderUserBar();
+      renderNav();
       return state.practiceHistory;
     }
   } catch {
@@ -2634,8 +3634,42 @@ async function loadAllSessions() {
   return state.practiceHistory;
 }
 
+async function reloadCasesCatalog() {
+  try {
+    const casesIndex = await fetchJson('./data/cases-index.json');
+    state.casesIndex = casesIndex;
+    const packageFiles = new Map();
+    const hierarchy = normalizeCasesHierarchy(casesIndex);
+    hierarchy.forEach((disease) => {
+      (disease.cases || []).forEach((c) => {
+        (c.personas || []).forEach((p) => {
+          if (p.file) packageFiles.set(p.file, c.case_id);
+        });
+        if (c.file) packageFiles.set(c.file, c.case_id);
+      });
+    });
+    (casesIndex.cases || []).forEach((c) => {
+      if (c.file) packageFiles.set(c.file, c.case_id);
+    });
+    await Promise.all(
+      [...new Set([...packageFiles.keys()])].map(async (file) => {
+        try {
+          const pkg = await fetchJson(`./data/${file}`);
+          const id = pkg.meta?.case_id;
+          if (id) state.casePackages[id] = pkg;
+        } catch {
+          /* 单个病例失败不阻断选人 */
+        }
+      }),
+    );
+  } catch (err) {
+    console.warn('reloadCasesCatalog failed', err);
+  }
+}
+
 async function loadPracticePage() {
   if (!isAuthenticated()) return;
+  await reloadCasesCatalog();
   await loadAllSessions();
   const savedId = readPersistedPracticeSessionId();
   const stillOpen = (state.practiceHistory || []).find(
@@ -2715,6 +3749,7 @@ function openPracticePicker() {
   voiceCtrl.stopListening({ commit: false });
   voiceCtrl.stopPlayback();
   state.practice.pickerOpen = true;
+  state.practicePickerScene = state.practicePickerScene || 'all';
   state.practice.sessionId = null;
   state.practice.caseInfo = null;
   state.practice.casePackage = null;
@@ -2726,6 +3761,9 @@ function openPracticePicker() {
   state.practice.composerDraft = '';
   if (state.route === 'practice') renderPractice();
   else navigate('practice');
+  reloadCasesCatalog().then(() => {
+    if (state.route === 'practice' && state.practice.pickerOpen) renderPractice();
+  });
 }
 
 function selectPracticePersona(diseaseCode, caseId, personaId) {
@@ -2746,6 +3784,24 @@ function personaLabel(code) {
   return String(code).replace(/_/g, ' ');
 }
 
+function stripMdForDisplay(text) {
+  if (!text) return '';
+  let t = String(text).trim();
+  // 案例文稿误入展示字段时，去掉标题与列表标记
+  t = t.replace(/^#{1,6}\s+/gm, '');
+  t = t.replace(/^[-*+]\s+/gm, '');
+  t = t.replace(/\*\*(.+?)\*\*/g, '$1');
+  t = t.replace(/`([^`]+)`/g, '$1');
+  t = t.replace(/\n{3,}/g, '\n\n').trim();
+  if (/培训案例|使用场景|建议时长|虚构声明/.test(t) && t.includes('\n')) {
+    const lines = t.split(/\n+/).map((x) => x.trim()).filter(Boolean)
+      .filter((ln) => !/^(使用场景|培训案例|建议时长|虚构声明|练什么)/.test(ln)
+        && !/^[一二三四五六七八九十]+[、.]/.test(ln));
+    t = lines.slice(0, 6).join('；') || t;
+  }
+  return t;
+}
+
 function buildPracticeReferenceHtml(pkg, caseInfo) {
   if (!pkg) {
     const bio = caseInfo?.persona?.lay_bio || state.practice.persona?.lay_bio;
@@ -2753,7 +3809,7 @@ function buildPracticeReferenceHtml(pkg, caseInfo) {
       <div class="practice-ref-card">
         <h4>受试者简介</h4>
         <p>${escapeHtml(caseInfo?.short_title || '—')}</p>
-        ${bio ? `<p class="practice-ref-muted">${escapeHtml(bio)}</p>` : ''}
+        ${bio ? `<p class="practice-ref-muted">${escapeHtml(stripMdForDisplay(bio))}</p>` : ''}
       </div>`;
   }
   const script = pkg.session_script || {};
@@ -2763,11 +3819,17 @@ function buildPracticeReferenceHtml(pkg, caseInfo) {
   const visitItems = (pkg.visits?.[0]?.items || []).map((i) => i.label);
   const topics = (pkg.key_concerns || []).map((k) => k.topic).filter(Boolean);
   const checklist = visitItems.length ? visitItems : topics;
+  const layBio = stripMdForDisplay(p.lay_bio || '');
+  const visitCtx = stripMdForDisplay(script.visit_context || '');
+  const chief = stripMdForDisplay(cs.chief_complaint || '');
+  const history = (cs.history_present || [])
+    .map((h) => stripMdForDisplay(h))
+    .filter((h) => h && !/^(使用场景|培训案例|建议时长|虚构声明|练什么)/.test(h));
 
   return `
     <div class="practice-ref-card">
       <h4>${escapeHtml(p.display_name || '受试者')}</h4>
-      <p>${escapeHtml(p.lay_bio || '')}</p>
+      <p>${escapeHtml(layBio)}</p>
       <div class="tag-row">
         ${p.age_years ? `<span class="tag">${p.age_years} 岁</span>` : ''}
         ${p.sex ? `<span class="tag">${personaLabel(p.sex)}</span>` : ''}
@@ -2777,15 +3839,15 @@ function buildPracticeReferenceHtml(pkg, caseInfo) {
     <div class="practice-ref-card">
       <h4>本次访视</h4>
       <p>${escapeHtml(script.scene_label || caseInfo?.scene_label || '')}</p>
-      ${script.visit_context ? `<p class="practice-ref-muted">${escapeHtml(script.visit_context)}</p>` : ''}
+      ${visitCtx ? `<p class="practice-ref-muted">${escapeHtml(visitCtx)}</p>` : ''}
       ${script.trainee_role_hint ? `<p class="practice-ref-tip">${escapeHtml(script.trainee_role_hint)}</p>` : ''}
     </div>
     <div class="practice-ref-card">
       <h4>病历可见信息</h4>
-      <p><strong>主诉：</strong>${escapeHtml(cs.chief_complaint || '—')}</p>
+      <p><strong>主诉：</strong>${escapeHtml(chief || '—')}</p>
       <p><strong>病程：</strong>${escapeHtml([cs.disease_duration, cs.disease_stage].filter(Boolean).join(' · ') || '—')}</p>
-      ${(cs.history_present || []).length ? `
-        <ul class="practice-ref-list">${cs.history_present.slice(0, 4).map((h) => `<li>${escapeHtml(h)}</li>`).join('')}</ul>
+      ${history.length ? `
+        <ul class="practice-ref-list">${history.slice(0, 6).map((h) => `<li>${escapeHtml(h)}</li>`).join('')}</ul>
       ` : ''}
       ${med.investigational_summary ? `<p class="practice-ref-muted"><strong>方案用药：</strong>${escapeHtml(med.investigational_summary)}</p>` : ''}
     </div>
@@ -2848,6 +3910,7 @@ function exitPractice({ openPicker = false, force = false } = {}) {
     showAllResumes: false,
     feedExpanded: false,
     checkpointOpen: false,
+    leftStackOpen: localStorage.getItem('practiceLeftStackOpen') === '1',
     patientAffect: null,
     restoring: false,
   };
@@ -3243,11 +4306,11 @@ function buildLibraryHomeHtml(hierarchy, stats) {
 
   return `
     <div class="cases-library-home">
-      <div class="explain-box">
+      <div class="explain-box cases-library-intro">
         <div class="explain-box-label">训练病例资料库</div>
-        <p>这里是全部 SP 训练病例的入口。建议路径：<strong>资料库 → 病种 → 试验 → 受试者 → 详细资料</strong>。也可使用左侧搜索或下方卡片快速进入。</p>
+        <p>全部 SP 训练病例入口。路径：<strong>资料库 → 病种 → 试验 → 受试者 → 详细资料</strong>；也可用上方搜索或下方卡片直达。</p>
       </div>
-      <div class="stats-grid">
+      <div class="stats-grid cases-stats-grid">
         ${statCard(stats.diseases, '病种', '#0f766e', '<path d="M12 2L2 7l10 5 10-5-10-5z"/>')}
         ${statCard(stats.cases, '试验病例', '#2563eb', '<path d="M4 6h16v12H4z"/>')}
         ${statCard(stats.personas, '受试者', '#7c3aed', '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>')}
@@ -3647,28 +4710,79 @@ function renderCases() {
 }
 
 function buildScenesHtml() {
+  const scenes = state.scenes?.scenes || [];
+  const live = scenes.filter((s) => s.status === 'mvp' || s.status === 'beta');
+  const planned = scenes.filter((s) => s.status === 'planned');
+  const diseases = state.casesIndex?.diseases || [];
+  const caseCards = diseases.map((d) => {
+    const cases = d.cases || [];
+    const personas = cases.flatMap((c) => c.personas || []);
+    return `
+      <article class="card scene-card">
+        <div class="card-accent" style="--cat-color:#0f766e"></div>
+        <div class="card-body">
+          <div class="scene-code">${escapeHtml(d.disease_code || '')}</div>
+          <div class="card-head">
+            <h3>${escapeHtml(d.name_zh || d.name || '病种')}</h3>
+            <span class="badge badge-active">${cases.length} 个试验</span>
+          </div>
+          <p class="card-meta">受试者：${personas.map((p) => p.display_label || p.persona_id).filter(Boolean).slice(0, 6).map((x) => escapeHtml(x)).join('、') || '—'}</p>
+        </div>
+      </article>`;
+  }).join('');
+
   return `
+    <div class="explain-box" style="margin-bottom:20px">
+      <div class="explain-box-label">场景 × 病例</div>
+      <p>场景决定<strong>练哪类沟通</strong>；病例决定<strong>对面是谁、能说哪些事实</strong>。当前已启用知情同意，以及高血压随访 / 依从相关场景。</p>
+    </div>
+
+    <div class="section-head">
+      <h3 class="section-title">已启用 / 可用场景</h3>
+      <span class="section-sub">${live.length} 个</span>
+    </div>
     <div class="cards-grid">
-      ${state.scenes.scenes.map(
-        (s) => `
+      ${live.map((s) => `
         <article class="card scene-card">
-          <div class="card-accent" style="--cat-color:${s.status === 'mvp' ? '#059669' : '#94a3b8'}"></div>
+          <div class="card-accent" style="--cat-color:${s.status === 'mvp' ? '#059669' : '#2563eb'}"></div>
           <div class="card-body">
-            <div class="scene-code">${s.code}</div>
+            <div class="scene-code">${escapeHtml(s.code)}</div>
             <div class="card-head">
-              <h3>${s.name}</h3>
-              <span class="badge ${s.status === 'mvp' ? 'badge-active' : 'badge-reference'}">${s.statusLabel}</span>
+              <h3>${escapeHtml(s.name)}</h3>
+              <span class="badge ${s.status === 'mvp' ? 'badge-active' : 'badge-reference'}">${escapeHtml(s.statusLabel)}</span>
             </div>
-            <p class="card-meta">${s.description}</p>
+            <p class="card-meta">${escapeHtml(s.description)}</p>
             <div class="tag-row">
-              ${s.primaryStandards.map((id) => {
+              ${(s.primaryStandards || []).map((id) => {
                 const st = state.standards.standards.find((x) => x.id === id);
                 return st ? `<span class="tag tag-clickable" data-std="${id}">${st.shortTitle}</span>` : '';
               }).join('')}
             </div>
           </div>
-        </article>`,
-      ).join('')}
+        </article>`).join('') || '<p class="card-meta">暂无场景数据</p>'}
+    </div>
+
+    ${planned.length ? `
+      <div class="section-head">
+        <h3 class="section-title">预留场景</h3>
+        <span class="section-sub">尚未作为主练路径</span>
+      </div>
+      <div class="tag-row" style="margin-bottom:20px">
+        ${planned.map((s) => `<span class="tag">${escapeHtml(s.code)} · ${escapeHtml(s.name)}</span>`).join('')}
+      </div>
+    ` : ''}
+
+    <div class="section-head">
+      <h3 class="section-title">病例资料库（概览）</h3>
+      <span class="section-sub">详情在「病例资料」页浏览；管理端可导入</span>
+    </div>
+    <div class="cards-grid">
+      ${caseCards || '<p class="card-meta">暂无病例索引</p>'}
+    </div>
+
+    <div class="guide-cta" style="margin-top:16px">
+      <button type="button" data-goto="cases">打开病例资料</button>
+      <button type="button" class="secondary" data-goto="admin-cases">病例与场景维护</button>
     </div>
   `;
 }
@@ -3708,25 +4822,26 @@ function buildTermsHtml() {
 
 const EXPLAIN_SECTION_BUILDERS = {
   overview: buildOverviewHtml,
+  practice: buildPracticeGuideHtml,
   standards: buildStandardsHtml,
   rubric: buildRubricHtml,
   database: buildDatabaseHtml,
   scenes: buildScenesHtml,
-  timeline: buildTimelineHtml,
   terms: buildTermsHtml,
 };
 
 const EXPLAIN_SECTION_DESC = {
-  overview: '双底座架构、纳入标准数量与主依据文件一览',
+  overview: '当前产品怎么练、怎么评：练习/考核闭环 + 双底座（标准评分 × 病例事实）',
+  practice: '对话页能力：选人、继续/新建、情绪与语音、结束反馈；练习与考核差异',
   standards: '每份法规用白话说明：是什么、为什么需要、跟训练有什么关系',
-  rubric: '练完对话后如何打分：0–100 参考分、清单线、维度权重与检查清单',
-  database: '标准、病例是否入库，AI 能不能通话并写进日志',
-  scenes: '一期仅 S1 启用 · 其余待 B0 病例包就绪',
-  timeline: '规范生效与切换节点 · 版本回归参考',
-  terms: '遇到看不懂的词来这里查 · 后面做训练系统也会用这些统一叫法',
+  rubric: '反馈以规范清单为主，练习参考分 0–100 为辅；含维度权重与红线',
+  database: '标准与病例是否入库，Agnes / 会话日志是否可写可读',
+  scenes: '知情同意与随访等场景状态，以及病种/受试者资料库概览',
+  terms: '统一叫法：受试者、访视、AE、知情同意等',
 };
 
 function renderExplain() {
+  if (state.explainSection === 'timeline') state.explainSection = 'overview';
   const currentIdx = EXPLAIN_SECTIONS.findIndex((s) => s.id === state.explainSection);
   const idx = currentIdx >= 0 ? currentIdx : 0;
   const current = EXPLAIN_SECTIONS[idx];
@@ -3742,7 +4857,7 @@ function renderExplain() {
         <div class="explain-sidebar-head">
           <p class="hero-eyebrow">System Guide</p>
           <h4>系统功能</h4>
-          <p>7 个模块，点选切换内部页面</p>
+          <p>${EXPLAIN_SECTIONS.length} 个模块，按现在产品能力说明</p>
         </div>
         <nav class="explain-side-nav">
           ${EXPLAIN_SECTIONS.map((s, i) => `
@@ -3950,23 +5065,77 @@ function inferStagesFromMessages(messages) {
   return inferCheckpointsFromMessages(messages);
 }
 
+function getActiveRubricForPractice() {
+  const sceneKey = getSceneKeyForPractice();
+  const caseId = state.practice.caseInfo?.case_id || state.selectedCaseId || '';
+  return isFollowUpScene(sceneKey, caseId) ? state.rubricFollowup : state.rubric;
+}
+
+function getRubricGroups(rubric) {
+  return [...(rubric?.groups || [])].sort((a, b) => (a.order || 0) - (b.order || 0));
+}
+
+function buildGroupProgressFromCheckpoints(checkpoints, rubric) {
+  const byId = Object.fromEntries((checkpoints || []).map((c) => [c.id, c]));
+  return getRubricGroups(rubric)
+    .filter((g) => !g.isGate)
+    .map((g) => {
+      const members = (rubric?.items || []).filter((i) => i.enabledMvp && i.group_id === g.id && !i.hardFail && i.type !== 'prohibition');
+      const done = members.filter((i) => byId[i.id]?.status === 'done').length;
+      const total = members.length;
+      return {
+        id: g.id,
+        name: g.name,
+        displayMax: g.displayMax,
+        done,
+        total,
+        pct: total ? Math.round((100 * done) / total) : 0,
+      };
+    })
+    .filter((g) => g.total > 0);
+}
+
 function buildCheckpointPanelHtml(messages, { compact = false, engagement = 'practice' } = {}) {
-  if (engagement === 'assessment') {
-    return `
-      <div class="checkpoint-panel checkpoint-panel--assessment">
-        <p><strong>考核模式</strong> · 不提供沟通进度提示。请独立完成对话后交卷。</p>
-      </div>`;
-  }
+  const rubric = getActiveRubricForPractice();
   const checkpoints = inferCheckpointsFromMessages(messages);
+  const groupProg = buildGroupProgressFromCheckpoints(checkpoints, rubric);
   const done = checkpoints.filter((s) => s.status === 'done').length;
   const total = checkpoints.length;
   const pct = total ? Math.round((100 * done) / total) : 0;
+
+  if (engagement === 'assessment') {
+    return `
+      <div class="checkpoint-panel checkpoint-panel--assessment">
+        <div class="checkpoint-panel-head">
+          <div>
+            <strong>考核 · 大类粗进度</strong>
+            <span class="checkpoint-panel-sub">不展示小项细节 · 结束后仍有完整清单与参考分</span>
+          </div>
+          <div class="checkpoint-panel-stats">
+            <span class="checkpoint-pct">${pct}%</span>
+            <span>约 ${done}/${total}</span>
+          </div>
+        </div>
+        <div class="checkpoint-progress-track" aria-hidden="true">
+          <div class="checkpoint-progress-fill" style="width:${pct}%"></div>
+        </div>
+        <ul class="group-progress-list">
+          ${groupProg.map((g) => `
+            <li>
+              <span class="group-progress-name">${escapeHtml(g.name)}</span>
+              <span class="group-progress-bar"><span style="width:${g.pct}%"></span></span>
+              <span class="group-progress-pct">${g.pct}%</span>
+            </li>`).join('') || '<li class="card-meta">暂无大类进度</li>'}
+        </ul>
+      </div>`;
+  }
+
   return `
     <div class="checkpoint-panel${compact ? ' is-compact' : ''}">
       <div class="checkpoint-panel-head">
         <div>
           <strong>沟通检查点</strong>
-          <span class="checkpoint-panel-sub">启发式参考 · 最终以结束反馈为准</span>
+          <span class="checkpoint-panel-sub">启发式参考 · 最终以结束清单为准</span>
         </div>
         <div class="checkpoint-panel-stats">
           <span class="checkpoint-pct">${pct}%</span>
@@ -3976,6 +5145,15 @@ function buildCheckpointPanelHtml(messages, { compact = false, engagement = 'pra
       <div class="checkpoint-progress-track" aria-hidden="true">
         <div class="checkpoint-progress-fill" style="width:${pct}%"></div>
       </div>
+      ${groupProg.length ? `
+      <ul class="group-progress-list group-progress-list--compact">
+        ${groupProg.map((g) => `
+          <li title="${escapeHtml(g.name)} ${g.done}/${g.total}">
+            <span class="group-progress-name">${escapeHtml(g.name)}</span>
+            <span class="group-progress-bar"><span style="width:${g.pct}%"></span></span>
+            <span class="group-progress-pct">${g.pct}%</span>
+          </li>`).join('')}
+      </ul>` : ''}
       <ol class="checkpoint-list">
         ${checkpoints.map((s, idx) => `
           <li class="checkpoint-item is-${s.status}" title="${escapeHtml(s.hint)}">
@@ -3994,25 +5172,172 @@ function buildStageProgressHtml(messages) {
   return buildCheckpointPanelHtml(messages, { engagement: state.engagementMode || 'practice' });
 }
 
-function buildPracticeGuideHtml() {
+function buildPracticeBriefingHtml({ engagement = 'practice' } = {}) {
+  const selectedPersona = getSelectedPersona();
+  const selectedCase = getSelectedCaseEntry();
+  const pkg = resolvePracticeCasePackage(selectedCase?.case_id || state.selectedCaseId) || getSelectedCasePackage();
+  const p = pkg?.persona || {};
+  const cs = pkg?.clinical_summary || {};
+  const script = pkg?.session_script || {};
+  const personaId = selectedPersona?.persona_id || p.persona_id || '';
+  const displayName = p.display_name || selectedPersona?.display_label || '受试者';
+  const sex = personaLabel(p.sex) || '';
+  const age = p.age_years ? `${p.age_years}岁` : (p.age_band || '');
+  const portrait = personaPortraitUrl(personaId);
+  const sceneLabel = script.scene_label || selectedCase?.short_title || '';
+  const diseaseName = pkg?.disease?.name_zh || getSelectedDisease()?.name_zh || '';
+  const diseaseCode = pkg?.disease?.disease_code || state.selectedDiseaseCode || '';
+  const scoringEmphasis = pkg?.scoring?.emphasis?.traineeBrief
+    || pkg?.scoring?.emphasis?.patientStance
+    || '';
+  const concerns = (pkg?.key_concerns || []).map((k) => k.topic).filter(Boolean).slice(0, 4);
+  const historyBits = (cs.history_present || []).slice(0, 3);
+
   const sceneKey = getSceneKeyForPractice();
-  const caseId = state.practice.caseInfo?.case_id || state.selectedCaseId || '';
-  const checkpoints = buildCheckpointDefsForScene(sceneKey, caseId);
+  const caseId = selectedCase?.case_id || state.selectedCaseId || '';
   const isFu = isFollowUpScene(sceneKey, caseId);
+  const rubric = getActiveRubricForPractice();
+  const groups = getRubricGroups(rubric);
+  const lay = state.rubricLay || {};
+  const contentGroups = groups.filter((g) => !g.isGate);
+  const redline = groups.find((g) => g.isGate);
+  const redItems = redline
+    ? (rubric?.items || []).filter((i) => i.enabledMvp && (i.group_id === redline.id || i.hardFail))
+    : [];
+  const checkpointDefs = buildCheckpointDefsForScene(sceneKey, caseId);
+  const levelOutcome = isFu
+    ? '练完你能：非责备地问清用药/漏服、不适与合并用药，并对照随访清单改进。'
+    : '练完你能：把试验目的、流程、风险与自愿退出讲清楚，并回应受试者关切。';
+  const levelBrief = (script.system_opening || '').trim()
+    || (script.visit_context || '').trim()
+    || levelOutcome;
+  const openingSeeds = script.patient_greeting_seeds || [];
+  const openingHint = openingSeeds.length > 1
+    ? `开场会从 ${openingSeeds.length} 种说法切入（每次可能不同），请按对方当下反应应变，不要背稿。`
+    : (concerns.length
+      ? `对方可能先抛出关切（如「${concerns.slice(0, 2).join('」「')}」），请先接住再展开。`
+      : '开场后请先接住对方关切，再按检查点推进。');
+
+  const dossierRows = [
+    ['姓名', displayName],
+    ['年龄', age || '—'],
+    ['性别', sex || '—'],
+    ['职业', p.occupation ? personaLabel(p.occupation) : '—'],
+    ['本次场景', sceneLabel || '—'],
+    ['病种', diseaseName ? `${diseaseName}${diseaseCode ? `（${diseaseCode}）` : ''}` : '—'],
+    ['主诉', cs.chief_complaint || selectedPersona?.one_liner || '—'],
+  ].filter(([, v]) => v && v !== '—');
+
+  const taskCards = contentGroups.map((g, gi) => {
+    const items = (rubric?.items || []).filter((i) => i.enabledMvp && i.group_id === g.id && !i.hardFail);
+    const preview = items.slice(0, 3).map((it) => {
+      const layItem = lay[it.id] || {};
+      return layItem.layTitle || it.title || it.id;
+    });
+    const more = items.length > preview.length ? items.length - preview.length : 0;
+    const maxLabel = g.displayMax != null ? `${g.displayMax} 分` : '';
+    return `
+      <article class="briefing-task-card">
+        <header>
+          <span class="briefing-task-num">${gi + 1}</span>
+          <div>
+            <strong>${escapeHtml(g.name)}</strong>
+            <span>${maxLabel ? `展示约 ${maxLabel}` : ''}${items.length ? ` · ${items.length} 项` : ''}</span>
+          </div>
+        </header>
+        <ul>
+          ${preview.map((t) => `<li>${escapeHtml(t)}</li>`).join('')}
+          ${more ? `<li class="is-more">另有 ${more} 项，练习中左侧可查看</li>` : ''}
+        </ul>
+      </article>`;
+  }).join('');
+
+  const redlineText = redItems.length
+    ? redItems.map((i) => (lay[i.id] || {}).layTitle || i.title).join('、')
+    : (isFu ? '责备恐吓、自行决定医学处理' : '');
+
+  const checkpointPreview = checkpointDefs.slice(0, 8).map((d, i) => `
+    <li><span class="briefing-cp-num">${i + 1}</span><span>${escapeHtml(d.title)}</span></li>
+  `).join('');
+  const checkpointMore = checkpointDefs.length > 8
+    ? `<li class="is-more">另有 ${checkpointDefs.length - 8} 项，开练后左侧可全程对照</li>`
+    : '';
+
   return `
-    <div class="practice-guide-card">
-      <div class="practice-guide-head">
-        <strong>开练导览 · ${isFu ? '随访' : '知情同意'} · ${checkpoints.length} 个沟通检查点</strong>
-        <span>练完要达成：对照下面清单把该讲的讲全、该问的问清；结束后的反馈会逐项核对。</span>
+    <div class="practice-briefing">
+      <div class="briefing-level-hero" aria-label="本关训练目标">
+        <span class="briefing-level-kicker">这一关 · ${escapeHtml(isFu ? '随访（询问）' : (sceneLabel || '知情同意'))}${diseaseName ? ` · ${escapeHtml(diseaseName)}` : ''}</span>
+        <h3>${escapeHtml(sceneLabel || (isFu ? '随访沟通' : '知情同意沟通'))} · ${escapeHtml(displayName)}</h3>
+        <p class="briefing-level-outcome">${escapeHtml(levelOutcome)}</p>
+        <p class="briefing-level-brief">${escapeHtml(levelBrief.length > 180 ? `${levelBrief.slice(0, 180)}…` : levelBrief)}</p>
+        ${scoringEmphasis ? `<p class="briefing-level-emphasis"><strong>本局侧重点：</strong>${escapeHtml(scoringEmphasis)}</p>` : ''}
+        <p class="briefing-level-opening">${escapeHtml(openingHint)}</p>
       </div>
-      <ol class="practice-guide-list practice-guide-list--grid">
-        ${checkpoints.map((s, i) => `
-          <li>
-            <span class="practice-guide-num">${i + 1}</span>
-            <div><strong>${escapeHtml(s.title)}</strong> — ${escapeHtml(s.hint)}</div>
-          </li>`).join('')}
-      </ol>
-      ${isFu ? '<p class="practice-guide-footnote">另含 2 项红线（责备恐吓、自行决定医学处理），触犯会直接判严重问题。</p>' : ''}
+
+      <aside class="persona-dossier" aria-label="受试者档案">
+        <div class="persona-dossier-hero">
+          <div class="persona-dossier-avatar">
+            <img src="${escapeHtml(portrait)}" alt="${escapeHtml(displayName)}" width="112" height="112" loading="eager" decoding="async" data-portrait-fallback="/static${escapeHtml(portrait)}" onerror="if(this.dataset.tried){this.hidden=true;this.nextElementSibling.hidden=false;}else{this.dataset.tried='1';this.src=this.dataset.portraitFallback;}" />
+            <span class="persona-dossier-avatar-fallback" hidden aria-hidden="true">${escapeHtml((displayName || '?').slice(0, 1))}</span>
+          </div>
+          <div class="persona-dossier-title">
+            <span class="persona-dossier-badge">对手档案</span>
+            <h3>${escapeHtml(displayName)}${age || sex ? ` · ${escapeHtml([age, sex].filter(Boolean).join(''))}` : ''}</h3>
+            <p>同一关卡换人 = 换策略，不是换考纲</p>
+          </div>
+          <button type="button" class="practice-link-btn" id="practice-open-picker">换受试者</button>
+        </div>
+        <dl class="persona-dossier-meta">
+          ${dossierRows.map(([k, v]) => `
+            <div>
+              <dt>${escapeHtml(k)}</dt>
+              <dd>${escapeHtml(v)}</dd>
+            </div>`).join('')}
+        </dl>
+        ${p.lay_bio ? `
+          <section class="persona-dossier-block">
+            <h4>人物简介</h4>
+            <p>${escapeHtml(p.lay_bio)}</p>
+          </section>` : ''}
+        ${historyBits.length ? `
+          <section class="persona-dossier-block">
+            <h4>病情要点</h4>
+            <ul>${historyBits.map((h) => `<li>${escapeHtml(h)}</li>`).join('')}</ul>
+          </section>` : ''}
+        ${script.trainee_role_hint || script.visit_context ? `
+          <section class="persona-dossier-block persona-dossier-block--tip">
+            <h4>本场沟通提示</h4>
+            ${script.visit_context ? `<p>${escapeHtml(script.visit_context)}</p>` : ''}
+            ${script.trainee_role_hint ? `<p class="persona-dossier-tip">${escapeHtml(script.trainee_role_hint)}</p>` : ''}
+          </section>` : ''}
+        ${concerns.length ? `
+          <section class="persona-dossier-block">
+            <h4>可能关心的问题</h4>
+            <div class="persona-dossier-chips">
+              ${concerns.map((c) => `<span>${escapeHtml(c)}</span>`).join('')}
+            </div>
+          </section>` : ''}
+        <p class="persona-dossier-foot">教学模拟档案 · 非真实受试者</p>
+      </aside>
+
+      <section class="briefing-tasks" aria-label="今日练习任务">
+        <header class="briefing-tasks-head">
+          <strong>${engagement === 'assessment' ? '考核' : '练习'}任务地图</strong>
+          <span>${isFu ? '随访清单' : '知情清单'} · ${contentGroups.length} 大类 · ${checkpointDefs.length} 检查点</span>
+        </header>
+        <div class="briefing-task-grid">${taskCards}</div>
+        <div class="briefing-checkpoint-preview">
+          <header>
+            <strong>开练前先认检查点</strong>
+            <span>对话中左侧会跟着亮</span>
+          </header>
+          <ol>${checkpointPreview}${checkpointMore}</ol>
+        </div>
+        ${redlineText ? `
+          <p class="briefing-redline">
+            <strong>红线</strong>：${escapeHtml(redlineText)}。触犯会一票否决。
+          </p>` : ''}
+      </section>
     </div>`;
 }
 
@@ -4029,11 +5354,17 @@ function buildTranscriptHtml(messages, personaLabelText) {
   if (!visible.length) return '<p class="card-meta">暂无对话正文。</p>';
   return `
     <div class="transcript-feed">
-      ${visible.map((m) => `
+      ${visible.map((m) => {
+        const affect = m.role === 'patient' ? resolveMessageAffect(m, messages) : null;
+        return `
         <div class="transcript-line role-${m.role}">
-          <span class="transcript-name">${escapeHtml(galSpeakerLabel(m.role, personaLabelText))}</span>
+          <div class="transcript-line-head">
+            <span class="transcript-name">${escapeHtml(galSpeakerLabel(m.role, personaLabelText))}</span>
+            ${affectChipHtml(affect, { tone: 'transcript' })}
+          </div>
           <p>${escapeHtml(stripPatientMarkdown(m.content || ''))}</p>
-        </div>`).join('')}
+        </div>`;
+      }).join('')}
     </div>`;
 }
 
@@ -4093,7 +5424,10 @@ function patchPracticeInChatUi() {
   }
   const meta = document.querySelector('.gal-dialog-feed-meta span');
   if (meta) {
-    meta.textContent = `对话 ${(p.messages || []).filter((m) => m.role !== 'system').length} 条 · 上滑可看全部历史`;
+    const n = (p.messages || []).filter((m) => m.role !== 'system').length;
+    meta.textContent = p.feedExpanded
+      ? `对话 ${n} 条 · 已展开，可上滑看更早内容 · 拖顶边调高度`
+      : `对话 ${n} 条 · 上滑可看历史 · 拖顶边可调高度`;
   }
   const busyHint = document.querySelector('.chat-busy-hint');
   if (p.busy) {
@@ -4111,7 +5445,7 @@ function patchPracticeInChatUi() {
   if (p.busy) clearChatInputImmediate();
   updateCheckpointFlash(p.messages);
   patchLiveFeedbackRailSoft();
-  if (p.checkpointOpen) patchCheckpointRail();
+  patchCheckpointRail();
   const moodPill = document.querySelector('.practice-gal-hud .status-pill.mood');
   const affectSummary = inferAffectFromDialogue(p.patientAffect, p.messages);
   if (moodPill && affectSummary.stance_label) {
@@ -4173,39 +5507,40 @@ function renderRecords() {
   viewEl.innerHTML = `
     <div class="records-page">
       ${renderPageBackBar()}
-      <div class="feedback-hero">
-        <p class="hero-eyebrow">Session Records</p>
-        <h3>对话记录管理</h3>
-        <p>这里汇总你所有的<strong>练习</strong>与<strong>考核</strong>记录。练习可多次新建对话；考核选定受试者后只能进行一场，结束后可「重新考核」。</p>
+      <div class="records-toolbar">
+        <div class="records-filters">
+          <label>类型
+            <select id="records-filter-mode">
+              <option value="all" ${!f.sessionMode || f.sessionMode === 'all' ? 'selected' : ''}>全部</option>
+              <option value="practice" ${f.sessionMode === 'practice' ? 'selected' : ''}>练习</option>
+              <option value="assessment" ${f.sessionMode === 'assessment' ? 'selected' : ''}>考核</option>
+            </select>
+          </label>
+          <label>状态
+            <select id="records-filter-status">
+              <option value="all" ${!f.status || f.status === 'all' ? 'selected' : ''}>全部</option>
+              <option value="in_progress" ${f.status === 'in_progress' ? 'selected' : ''}>进行中</option>
+              <option value="completed" ${f.status === 'completed' ? 'selected' : ''}>已结束</option>
+            </select>
+          </label>
+          <label>受试者
+            <select id="records-filter-persona">
+              <option value="all">全部受试者</option>
+              ${personaOptions.map((pid) => `<option value="${pid}" ${f.personaId === pid ? 'selected' : ''}>${escapeHtml(personaLabel(pid))}</option>`).join('')}
+            </select>
+          </label>
+        </div>
+        <div class="records-summary">共 <strong>${filtered.length}</strong> 条${filtered.length !== history.length ? `（筛选自 ${history.length}）` : ''}</div>
       </div>
-      <div class="records-filters">
-        <label>类型
-          <select id="records-filter-mode">
-            <option value="all" ${f.sessionMode === 'all' ? 'selected' : ''}>全部</option>
-            <option value="practice" ${f.sessionMode === 'practice' ? 'selected' : ''}>练习</option>
-            <option value="assessment" ${f.sessionMode === 'assessment' ? 'selected' : ''}>考核</option>
-          </select>
-        </label>
-        <label>状态
-          <select id="records-filter-status">
-            <option value="all" ${f.status === 'all' ? 'selected' : ''}>全部</option>
-            <option value="in_progress" ${f.status === 'in_progress' ? 'selected' : ''}>进行中</option>
-            <option value="completed" ${f.status === 'completed' ? 'selected' : ''}>已结束</option>
-          </select>
-        </label>
-        <label>受试者
-          <select id="records-filter-persona">
-            <option value="all">全部受试者</option>
-            ${personaOptions.map((pid) => `<option value="${pid}" ${f.personaId === pid ? 'selected' : ''}>${escapeHtml(personaLabel(pid))}</option>`).join('')}
-          </select>
-        </label>
-      </div>
-      <div class="records-summary">共 ${filtered.length} 条记录（全部 ${history.length} 条）</div>
       ${state.recordsLoading ? '<div class="feedback-loading"><p>加载中…</p></div>' : ''}
       <div class="records-list">
         ${filtered.length
           ? filtered.map((s) => buildSessionRecordRow(s)).join('')
-          : '<div class="feedback-history-empty">没有符合条件的记录。去「模拟对话」开始练习，或切换筛选条件。<br/><small>若刚换了云服务器或换了账号，历史在对应库/账号下，不会自动合并。</small></div>'}
+          : `<div class="feedback-history-empty">
+              没有符合条件的记录。
+              <button type="button" class="records-action" data-goto-practice style="margin-top:12px">去模拟对话</button>
+              <p class="admin-hint" style="margin-top:8px">若刚换了云服务器或账号，历史在对应库下，不会自动合并。</p>
+            </div>`}
       </div>
     </div>`;
 
@@ -4221,6 +5556,7 @@ function renderRecords() {
     state.recordsFilter.personaId = e.target.value;
     renderRecords();
   });
+  viewEl.querySelector('[data-goto-practice]')?.addEventListener('click', () => navigate('practice'));
   viewEl.querySelectorAll('[data-resume]').forEach((btn) => {
     btn.addEventListener('click', async () => {
       await resumePractice(btn.dataset.resume);
@@ -4340,26 +5676,39 @@ function renderPractice() {
     ? (assessmentState.completed.length ? '重新考核' : '开始考核')
     : '开始新练习';
   const startHint = engagement === 'assessment'
-    ? '考核仅允许一场进行中的对话，结束后保留记录与分数'
-    : '可创建多条独立练习对话';
+    ? '结束后保留本场评分；点「重新考核」会新开一场，不覆盖旧记录'
+    : '新建一场独立对话；历史练习与评分都保留，不会覆盖';
   const panelScroll = inChat ? ($('#chat-panel')?.scrollTop ?? 0) : 0;
   const winScroll = inChat ? window.scrollY : 0;
   const sessionBrief = inChat
     ? ((p.messages || []).find((m) => m.role === 'system')?.content || '')
     : '';
+  const leftStackOpen = p.leftStackOpen !== false;
   document.body.classList.toggle('gal-immersive', inChat);
+  if (inChat && active) startPracticeTimer();
+  else if (!inChat) flushPracticeTimer();
 
   if (inChat) digitalHumanCtrl.parkShell();
 
   viewEl.innerHTML = `
     <div class="practice-page ${inChat ? 'is-in-chat is-gal' : ''}">
       ${!inChat ? `
+      ${getUserProficiency() === 'newbie' && !isAdminUser(state.auth.user) ? `
+      <div class="practice-prof-strip" role="note">
+        <div>
+          <strong>新手阶段</strong>
+          <p>登录默认进使用手册。左侧进度：对话满 ${UX_VETERAN_SESSIONS} 场且累计练满 ${Math.round(UX_VETERAN_DURATION_MS / 60000)} 分钟后自动成为老手，之后登录直达本页。</p>
+        </div>
+        <div class="practice-prof-strip-actions">
+          <button type="button" class="practice-link-btn" data-goto="guide">回看使用手册</button>
+        </div>
+      </div>` : ''}
       <div class="practice-hero">
-        <p class="hero-eyebrow">${engagement === 'assessment' ? 'Assessment' : 'Practice Chat'}</p>
+        <p class="hero-eyebrow">${engagement === 'assessment' ? 'Assessment · 一关一练' : 'Practice · 从小白到会问会讲'}</p>
         <h3>${engagement === 'assessment' ? '模拟沟通考核' : '模拟沟通练习'}</h3>
         <p>${engagement === 'assessment'
-    ? '考核：严格模式，不可查阅病例参考。选定受试者 → 完成一场对话 → 结束评分。'
-    : '练习：可多次新建对话，参考/严格模式均可。所有记录与分数在「对话记录」中查看。'}</p>
+    ? '严格模式单场考核：先认清这一关练什么 → 对话 → 对照清单看哪里要改。'
+    : '先选关卡与对手，开练前看清「练完多会什么」；对话中对照检查点，结束再改进下一趟。'}</p>
         <button type="button" class="practice-link-btn" data-goto="records">查看全部对话记录 →</button>
       </div>
 
@@ -4386,29 +5735,6 @@ function renderPractice() {
         <span class="practice-mode-hint"><strong>严格模式</strong>：考核中不可查阅病例参考，不可翻书。</span>
       </div>
       `}
-
-      <div class="voice-bar">
-        <label class="voice-toggle">
-          <input type="checkbox" id="voice-toggle" ${v.enabled ? 'checked' : ''} />
-          <span>开启语音模拟</span>
-        </label>
-        ${v.enabled ? `
-          <div class="voice-controls">
-            <button type="button" class="voice-ctrl-btn ${v.listening ? 'is-hot' : ''}" id="voice-mic-btn" ${(v.speaking || v.processing) ? 'disabled' : ''}>
-              ${v.listening ? '停止说话' : '开始说话'}
-            </button>
-            <button type="button" class="voice-ctrl-btn secondary" id="voice-pause-btn" ${v.speaking ? '' : 'disabled'}>
-              暂停旁白
-            </button>
-          </div>
-          <label class="voice-autosend">
-            <input type="checkbox" id="voice-autosend" ${v.autoSend ? 'checked' : ''} />
-            <span>说完自动发送</span>
-          </label>
-        ` : ''}
-        <p class="voice-hint" id="voice-status-live">${escapeHtml(voiceStatusText())}</p>
-        <p class="voice-draft-hint" id="voice-draft-hint" ${(v.draft || v.interim || v.listening) ? '' : 'hidden'}>${escapeHtml([v.draft, v.interim].filter(Boolean).join(' ') ? `实时识别：${[v.draft, v.interim].filter(Boolean).join(' ')}` : (v.listening ? '说话时文字会实时出现在输入框' : ''))}</p>
-      </div>
       ` : ''}
 
       ${p.pickerOpen ? buildPracticePersonaPickerHtml() : !p.sessionId ? `
@@ -4429,23 +5755,14 @@ function renderPractice() {
               </button>
             </div>
           ` : `
-            <p class="practice-case-hint">已选择受试者，确认后即可${engagement === 'assessment' ? '开始考核' : '开始练习'}。</p>
-            <div class="practice-selected-persona">
-              <div class="practice-selected-persona-main">
-                <strong>${escapeHtml(selectedPersona.display_label)}</strong>
-                <span>${escapeHtml(selectedCase?.short_title || selectedCase?.case_id || '')}</span>
-              </div>
-              <button type="button" class="practice-link-btn" id="practice-open-picker">换受试者</button>
-            </div>
-            ${buildPracticeGuideHtml()}
+            ${buildPracticeBriefingHtml({ engagement })}
             ${(() => {
-              const lastId = readPersistedPracticeSessionId();
-              const canResume = lastId && (state.practiceHistory || []).some((s) => s.id === lastId && s.status === 'in_progress');
-              return canResume ? `
+              const last = latestInProgressForSelection();
+              return last ? `
               <div class="practice-resume-last">
-                <button type="button" class="practice-start-btn primary" id="practice-resume-last">
+                <button type="button" class="practice-start-btn primary" id="practice-resume-last" data-resume-last="${last.id}">
                   <span class="practice-start-icon">↩</span>
-                  <span><strong>继续刚才的对话</strong><small>恢复完整历史消息，不会只剩一句</small></span>
+                  <span><strong>继续刚才的对话</strong><small>仅当前受试者 · 最近一场未结束练习</small></span>
                 </button>
               </div>` : '';
             })()}
@@ -4473,10 +5790,10 @@ function renderPractice() {
               ` : ''}
             </div>
           ` : ''}
-          ${p.error ? `<div class="action-toast">${p.error}</div>` : ''}
+          ${p.error ? `<div class="action-toast${/正在生成|几十秒/.test(p.error) ? ' is-pending' : ''}">${escapeHtml(p.error)}</div>` : ''}
         </div>
       ` : `
-        <div class="practice-session-wrap practice-gal-wrap${refOpen ? ' is-ref-open' : ''}${p.checkpointOpen ? ' is-checkpoint-open' : ''}">
+        <div class="practice-session-wrap practice-gal-wrap${refOpen ? ' is-ref-open' : ''}${active ? ' has-checkpoint-rail is-checkpoint-open' : ''}${engagement === 'practice' && active ? ' has-live-rail' : ''}${active && !leftStackOpen ? ' is-left-stack-collapsed' : ''}${engagement === 'assessment' ? ' is-assessment' : ''}">
           <section class="practice-gal-stage-shell">
             <div class="practice-gal-hud">
               <div class="practice-gal-hud-left">
@@ -4492,8 +5809,8 @@ function renderPractice() {
                 ${engagement === 'practice' && active ? buildCoverageProgressHtml(p.messages, { compact: true }) : ''}
               </div>
               <div class="practice-gal-hud-right">
-                ${engagement === 'practice' && active ? `
-                  <button type="button" class="practice-action-btn ${p.checkpointOpen ? 'is-active' : ''}" id="practice-checkpoint-toggle">${p.checkpointOpen ? '收起检查点' : '沟通检查点'}</button>
+                ${active ? `
+                  <button type="button" class="practice-action-btn ${leftStackOpen ? 'is-active' : ''}" id="practice-left-toggle" title="${leftStackOpen ? '收起左侧面板' : '展开左侧面板'}">${leftStackOpen ? '收起侧栏' : '展开侧栏'}</button>
                 ` : ''}
                 ${engagement === 'practice' ? `<button type="button" class="practice-action-btn" id="practice-exit-cases" title="在本页选择其他受试者">换受试者</button>` : ''}
                 ${studyMode === 'reference' && engagement === 'practice' && active ? `
@@ -4502,18 +5819,26 @@ function renderPractice() {
                 <button type="button" class="practice-action-btn" data-goto="records">对话记录</button>
               </div>
             </div>
+
             <div class="practice-gal-stage-mount" id="digital-human-mount" aria-label="受试者形象"></div>
 
-            ${active && engagement === 'practice' ? buildLiveFeedbackRailHtml(p.messages, p.patientAffect, { busy: p.busy }) : ''}
-
-            ${active && p.checkpointOpen && engagement === 'practice' ? `
-              <aside class="practice-checkpoint-rail" id="practice-checkpoint-drawer" aria-label="沟通检查点">
-                ${buildCheckpointPanelHtml(p.messages, { engagement })}
-              </aside>
+            ${active ? `
+              <button type="button" class="practice-left-expand-fab" id="practice-left-expand-fab" ${leftStackOpen ? 'hidden' : ''} title="展开左侧面板">侧栏</button>
+              <div class="practice-left-stack${leftStackOpen ? '' : ' is-collapsed'}" id="practice-left-stack">
+                <div class="practice-left-stack-toolbar">
+                  <strong>练习侧栏</strong>
+                  <button type="button" class="practice-left-collapse" id="practice-left-collapse" aria-expanded="${leftStackOpen ? 'true' : 'false'}" title="收起左侧面板">收起</button>
+                </div>
+                ${engagement === 'practice' ? buildLiveFeedbackRailHtml(p.messages, p.patientAffect, { busy: p.busy }) : ''}
+                <aside class="practice-checkpoint-rail" id="practice-checkpoint-drawer" aria-label="沟通检查点">
+                  ${buildCheckpointPanelHtml(p.messages, { engagement })}
+                </aside>
+              </div>
             ` : ''}
 
             <div class="practice-gal-vn-layer">
-              <div class="gal-dialog-glass">
+              <div class="gal-dialog-glass${p.feedExpanded ? ' is-feed-expanded' : ''}" id="gal-dialog-glass">
+                <div class="gal-dialog-resize" id="gal-dialog-resize" title="拖拽上边调整高度（双击恢复默认）" role="separator" aria-orientation="horizontal" aria-label="拖拽调整对话框高度"></div>
                 ${sessionBrief ? `
                   <details class="gal-session-brief">
                     <summary>本次任务提示</summary>
@@ -4524,10 +5849,10 @@ function renderPractice() {
                   <p class="gal-dialog-hint"><strong>受试者：</strong>${escapeHtml(p.persona.lay_bio)}</p>
                 ` : ''}
                 ${engagement === 'assessment' && active ? `
-                  <div class="gal-assessment-banner">考核进行中 · 不提供进度提示 · 不可退出，请完成后点「结束考核」</div>
+                  <div class="gal-assessment-banner">考核进行中 · 左侧为大类粗进度 · 不可退出，请完成后点「结束考核」</div>
                 ` : ''}
                 <div class="gal-dialog-feed-meta">
-                  <span>对话 ${(p.messages || []).filter((m) => m.role !== 'system').length} 条 · 上滑可看全部历史</span>
+                  <span>对话 ${(p.messages || []).filter((m) => m.role !== 'system').length} 条 · ${p.feedExpanded ? '已展开，可上滑看更早内容 · 拖顶边调高度' : '上滑可看历史 · 拖顶边可调高度'}</span>
                   <button type="button" class="practice-link-btn" id="practice-feed-expand">${p.feedExpanded ? '收起对话框' : '展开全部对话'}</button>
                 </div>
                 <div class="gal-dialog-feed${p.feedExpanded ? ' is-expanded' : ''}" id="chat-panel" aria-label="对话记录">
@@ -4535,15 +5860,19 @@ function renderPractice() {
                 </div>
                 ${active ? `
                   <form class="gal-dialog-input" id="chat-form">
-                    <textarea id="chat-input" rows="2" placeholder="输入要对受试者说的话… 上滑查看历史 · Enter 发送" ${p.busy ? '' : ''}></textarea>
+                    <div class="gal-input-shell">
+                      <textarea id="chat-input" rows="2" placeholder="打字输入，或点右侧「说话」用语音… Enter 发送" ${p.busy ? '' : ''}></textarea>
+                      <div class="gal-mic-slot">${buildGalMicButtonHtml()}</div>
+                    </div>
                     <div class="chat-actions gal-dialog-actions">
-                      <button type="submit" class="gal-action-btn gal-action-btn--primary" id="chat-send" ${p.busy ? 'disabled' : ''}>发送</button>
-                      <div class="gal-dialog-actions-right">
-                        <div class="gal-voice-actions">${buildGalVoiceActionsInnerHtml()}</div>
+                      <div class="gal-dialog-actions-left">
                         <button type="button" class="gal-action-btn gal-action-btn--secondary" id="practice-complete" ${p.busy ? 'disabled' : ''}>${engagement === 'assessment' ? '结束考核' : '结束练习'}</button>
+                        <div class="gal-voice-actions">${buildGalVoiceActionsInnerHtml()}</div>
                       </div>
+                      <button type="submit" class="gal-action-btn gal-action-btn--primary" id="chat-send" ${p.busy ? 'disabled' : ''}>发送</button>
                     </div>
                     <p class="gal-voice-status" id="voice-status-live">${escapeHtml(voiceStatusText())}</p>
+                    <p class="gal-voice-draft" id="voice-draft-hint" ${(v.draft || v.interim || v.listening) ? '' : 'hidden'}>${escapeHtml([v.draft, v.interim].filter(Boolean).join(' ') ? `实时识别：${[v.draft, v.interim].filter(Boolean).join(' ')}` : (v.listening ? '说话时文字会实时出现在输入框' : ''))}</p>
                     ${p.busy ? '<p class="chat-busy-hint">受试者回复中…</p>' : ''}
                   </form>
                 ` : `
@@ -4552,7 +5881,7 @@ function renderPractice() {
                     <button type="button" class="secondary" id="practice-restart">再练一次</button>
                   </div>
                 `}
-                ${p.error ? `<div class="action-toast gal-dialog-error">${p.error}</div>` : ''}
+                ${p.error ? `<div class="action-toast gal-dialog-error${/正在生成|几十秒/.test(p.error) ? ' is-pending' : (/连不上|失败|错误|无权|不能/.test(p.error) ? ' is-danger' : '')}">${escapeHtml(p.error)}</div>` : ''}
               </div>
             </div>
           </section>
@@ -4596,15 +5925,6 @@ function renderPractice() {
 
   if (inChat) {
     bindGalVoiceControls();
-  } else {
-    $('#voice-toggle')?.addEventListener('change', async (e) => {
-      await voiceCtrl.setEnabled(e.target.checked);
-      if (state.route === 'practice') renderPractice();
-    });
-    $('#voice-autosend')?.addEventListener('change', (e) => {
-      state.voice.autoSend = e.target.checked;
-    });
-    bindGalVoiceMicPause();
   }
   bindLiveRailEvents();
   viewEl.querySelectorAll('[data-engagement]').forEach((btn) => {
@@ -4629,18 +5949,19 @@ function renderPractice() {
   $('#practice-start')?.addEventListener('click', startPractice);
   $('#practice-open-picker')?.addEventListener('click', openPracticePicker);
   $('#practice-resume-last')?.addEventListener('click', async () => {
-    const id = readPersistedPracticeSessionId();
+    const id = $('#practice-resume-last')?.dataset?.resumeLast
+      || latestInProgressForSelection()?.id;
     if (id) await resumePractice(id);
   });
   $('#practice-feed-expand')?.addEventListener('click', () => {
     state.practice.feedExpanded = !state.practice.feedExpanded;
     patchFeedExpanded();
-    scrollChatFeedToEnd();
   });
-  $('#practice-checkpoint-toggle')?.addEventListener('click', () => {
-    state.practice.checkpointOpen = !state.practice.checkpointOpen;
-    patchCheckpointRail();
-  });
+  bindGalDialogResize();
+  const toggleLeft = () => setLeftStackOpen(!(state.practice.leftStackOpen !== false));
+  $('#practice-left-toggle')?.addEventListener('click', toggleLeft);
+  $('#practice-left-collapse')?.addEventListener('click', () => setLeftStackOpen(false));
+  $('#practice-left-expand-fab')?.addEventListener('click', () => setLeftStackOpen(true));
   $('#practice-toggle-resumes')?.addEventListener('click', () => {
     state.practice.showAllResumes = !state.practice.showAllResumes;
     renderPractice();
@@ -4652,6 +5973,12 @@ function renderPractice() {
   $('#practice-picker-search')?.addEventListener('input', (e) => {
     state.practicePickerSearch = e.target.value;
     renderPractice();
+  });
+  viewEl.querySelectorAll('[data-practice-scene]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      state.practicePickerScene = btn.dataset.practiceScene || 'all';
+      renderPractice();
+    });
   });
   viewEl.querySelectorAll('[data-pick-persona]').forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -4846,6 +6173,9 @@ async function startPractice() {
     if (data.patient_affect) digitalHumanCtrl.setPatientMood(data.patient_affect);
     state.feedbackData = null;
     persistPracticeSessionId(data.session_id);
+    markPracticeStarted();
+    renderNav();
+    renderUserBar();
   } catch (err) {
     state.practice.error = `无法开始：${err.message || err}（请确认已启动后端 :8000）`;
   } finally {
@@ -4856,10 +6186,45 @@ async function startPractice() {
   }
 }
 
+async function forceExitEndedSession(message) {
+  voiceCtrl.stopListening({ commit: false });
+  voiceCtrl.stopPlayback();
+  persistPracticeSessionId(null);
+  const mode = state.practice.studyMode;
+  state.practice = {
+    sessionId: null,
+    caseInfo: null,
+    casePackage: null,
+    persona: null,
+    messages: [],
+    busy: false,
+    status: null,
+    error: '',
+    composerDraft: '',
+    studyMode: mode,
+    sessionMode: state.engagementMode || 'practice',
+    referenceOpen: false,
+    pickerOpen: false,
+    showAllResumes: false,
+    feedExpanded: false,
+    restoring: false,
+    patientAffect: null,
+  };
+  showPracticeAlertModal(
+    '本场对话已结束',
+    message || '不能再继续发送。请开始新练习，或到「练习反馈」查看评分。',
+  );
+  if (state.route === 'practice') await loadPracticePage();
+}
+
 async function sendPracticeTurn(text, opts = {}) {
   const content = String(text || '').trim();
   if (!content || !state.practice.sessionId) return;
   if (state.practice.busy) return;
+  if (state.practice.status === 'completed') {
+    await forceExitEndedSession('这场练习已经结束，请新开一场后再说。');
+    return;
+  }
 
   const nextTurn = Math.max(...(state.practice.messages || []).map((m) => m.turn_index ?? 0), -1) + 1;
   state.practice.messages = [
@@ -4892,28 +6257,38 @@ async function sendPracticeTurn(text, opts = {}) {
     } else {
       state.practice.patientAffect = inferAffectFromDialogue(null, data.messages || []);
     }
+    if (data.patient_ok === false) {
+      state.practice.error = String(data.patient_error || '暂时连不上模拟病人，请稍后重试');
+    }
     loadAllSessions().catch(() => {});
     state.practice.busy = false;
     if (state.route === 'practice') patchPracticeInChatUi();
     if (!state.practice.composerDraft) clearChatInputImmediate();
-    await speakLatestPatient();
+    if (data.patient_ok !== false) await speakLatestPatient();
   } catch (err) {
+    const msg = String(err.message || err);
     state.practice.messages = (state.practice.messages || []).filter((m) => !m._optimistic);
     state.practice.composerDraft = content;
-    state.practice.error = String(err.message || err);
+    state.practice.busy = false;
+    if (/会话已结束|无权访问/.test(msg)) {
+      await forceExitEndedSession(msg);
+      return;
+    }
+    state.practice.error = msg;
     const input = $('#chat-input');
     if (input) input.value = content;
-    state.practice.busy = false;
     if (state.route === 'practice') patchPracticeInChatUi();
   }
 }
 
 async function completePractice() {
   if (!state.practice.sessionId) return;
+  voiceCtrl.stopListening({ commit: false });
   voiceCtrl.stopPlayback();
   state.practice.busy = true;
-  state.practice.error = '正在生成建议反馈，可能需要几十秒…';
-  renderPractice();
+  state.practice.error = '';
+  if (state.route === 'practice') patchPracticeInChatUi();
+  showPracticeLoadingModal();
   try {
     const { res, data } = await fetchApi(`${API_BASE}/api/sessions/${state.practice.sessionId}/complete`, {
       method: 'POST',
@@ -4924,10 +6299,21 @@ async function completePractice() {
     state.selectedFeedbackSessionId = state.practice.sessionId;
     state.practice.error = '';
     persistPracticeSessionId(null);
+    closeModal({ force: true });
     navigate('feedback');
   } catch (err) {
-    state.practice.error = String(err.message || err);
+    const msg = String(err.message || err);
+    state.practice.error = '';
     state.practice.busy = false;
+    closeModal({ force: true });
+    if (/会话已结束/.test(msg)) {
+      await forceExitEndedSession('这场练习其实已经结束了，请查看反馈或开始新练习。');
+      return;
+    }
+    showPracticeAlertModal(
+      /至少说一轮|样本不足|太短/.test(msg) ? '暂时还不能结束' : '结束练习失败',
+      msg,
+    );
     if (state.route === 'practice') renderPractice();
   } finally {
     state.practice.busy = false;
@@ -4941,12 +6327,12 @@ function buildFeedbackScoresHtml(scores) {
       <div class="feedback-score-panel feedback-score-panel--insufficient">
         <div class="feedback-score-main">
           <div class="feedback-score-number feedback-score-number--muted">—</div>
-          <div class="feedback-score-grade">${escapeHtml(scores.grade_label || '样本不足')}</div>
-          <p class="feedback-score-note">${escapeHtml(scores.note || '对话太短，不出练习参考分')}</p>
+          <div class="feedback-score-grade">${escapeHtml(scores.grade_label || '样本不足 · 暂无参考分')}</div>
+          <p class="feedback-score-note">${escapeHtml(scores.note || '对话太短，暂不出练习参考分')}</p>
         </div>
         <div class="feedback-score-explainer">
-          <strong>这是什么意思？</strong>
-          <p>系统需要足够长的对话（建议至少 3 轮、120 字以上）才能对照检查点给出可靠建议。只说一句和完整沟通不应同分，所以本次不出数值参考分。</p>
+          <strong>这不是报错</strong>
+          <p>对话样本还不够对照清单逐项核对。建议至少再练几轮（约 3 轮、120 字以上），再点结束。样本够了会先给达标/未达标，再附教学参考分。</p>
         </div>
       </div>`;
   }
@@ -4955,15 +6341,54 @@ function buildFeedbackScoresHtml(scores) {
   return `
     <div class="feedback-score-panel feedback-score-panel--compact">
       <div class="feedback-score-explainer">
-        <strong>这份分数代表什么？</strong>
-        <p>0–100 是<strong>练习参考分</strong>：环形图 = 总分，雷达图 = 各维度是否均衡，圆环占比 = 检查项通过情况。${passLine ? `达标线 ${scores.pass_score} 分。` : ''}不是正式考核或合规认证。</p>
+        <strong>主结果是清单，分数是汇总</strong>
+        <p>下面先看各检查项是否达标；0–100 是<strong>练习参考分</strong>（教学汇总，非问卷赋分、非法规定分）。${passLine ? `${passLine}。` : ''}环形图 = 总分，雷达图 = 维度是否均衡。</p>
       </div>
+    </div>`;
+}
+
+function buildFeedbackGroupsHtml(fb) {
+  const groups = fb.groups || fb.scores?.groups || [];
+  const items = fb.items || [];
+  if (!groups.length || !items.length) return '';
+  const byCode = Object.fromEntries(items.map((it) => [it.item_code, it]));
+  return `
+    <div class="feedback-groups">
+      <div class="section-head">
+        <h4 class="section-title">规范清单（按大类）</h4>
+        <span class="section-sub">主反馈 · 展开看每条 pass / fail 与证据</span>
+      </div>
+      ${groups.map((g) => {
+        const memberItems = (g.items || []).map((code) => byCode[code]).filter(Boolean);
+        const scoreLabel = g.is_gate
+          ? (g.passed ? '未踩红线' : `踩线 ${g.fail_count || 0}`)
+          : (g.display_score != null ? `${g.display_score}/${g.display_max}` : `${g.pct}%`);
+        return `
+          <details class="fb-group" ${g.is_gate && !g.passed ? 'open' : ''}>
+            <summary>
+              <span class="fb-group-name">${escapeHtml(g.name)}</span>
+              <span class="fb-group-score ${g.passed === false ? 'is-bad' : 'is-ok'}">${escapeHtml(String(scoreLabel))}</span>
+              <span class="fb-group-meta">${g.pass_count != null ? `${g.pass_count} 过` : ''} · ${memberItems.length} 项</span>
+            </summary>
+            <ul class="fb-group-items">
+              ${memberItems.map((it) => `
+                <li class="fb-group-item verdict-${it.verdict}">
+                  <span class="verdict verdict-${it.verdict}">${it.verdict}</span>
+                  <div>
+                    <strong>${escapeHtml(it.lay_title || it.title || it.item_code)}</strong>
+                    <span>${escapeHtml(it.comment || it.lay_explain || '')}</span>
+                    ${(it.evidence_spans || []).length ? `<em>${escapeHtml((it.evidence_spans[0] || {}).quote || '')}</em>` : ''}
+                  </div>
+                </li>`).join('') || '<li class="card-meta">暂无分项</li>'}
+            </ul>
+          </details>`;
+      }).join('')}
     </div>`;
 }
 
 function buildFeedbackTabBar(activeTab) {
   const tabs = [
-    { id: 'overview', label: '总览' },
+    { id: 'overview', label: '总览·清单' },
     { id: 'dimensions', label: '维度得分' },
     { id: 'improve', label: '改进建议' },
     { id: 'items', label: '分项明细' },
@@ -5015,11 +6440,12 @@ function buildFeedbackDetailHtml(fb) {
 
   const overviewPanel = `
     ${buildFeedbackScoresHtml(scores)}
+    ${!insufficient ? buildFeedbackGroupsHtml(fb) : ''}
     ${overviewViz}
     ${!insufficient && !scores?.total_score && fb.items?.length ? `
-      <div class="action-toast">该记录暂无参考分，请刷新页面；系统会自动从分项结果补算。算分规则见「系统功能 → 评分说明」。</div>` : ''}
+      <div class="action-toast">该记录暂无参考分，请刷新页面；系统会自动从分项结果补算。检查点说明见「使用手册 → 沟通检查点」。</div>` : ''}
     <div class="feedback-result-head ${headlinePass ? 'is-pass' : 'is-fail'}">
-      <div class="feedback-result-badge">${insufficient ? '样本不足 · 未出参考分' : (headlinePass ? '综合建议：达标' : '综合建议：需改进')}</div>
+      <div class="feedback-result-badge">${insufficient ? '样本不足 · 暂无参考分' : (headlinePass ? '综合建议：达标' : '综合建议：需改进')}</div>
       <h3>${insufficient ? '请继续多轮沟通后再结束' : (scores?.total_score != null ? `练习参考分 ${scores.total_score}/100` : (headlinePass ? '整体建议：通过' : '整体建议：需改进'))}</h3>
       <p class="feedback-summary">${escapeHtml(fb.summary || '')}</p>
       <div class="feedback-result-meta">
@@ -5093,7 +6519,7 @@ function buildFeedbackDetailHtml(fb) {
     <div class="guide-cta">
       <button type="button" data-goto="practice">返回对话 / 再练</button>
       <button type="button" class="secondary" data-goto="records">对话记录</button>
-      <button type="button" class="secondary" data-goto="explain-rubric">查看评分说明</button>
+      <button type="button" class="secondary" data-goto="guide">使用手册 · 检查点</button>
     </div>
   `;
 }
@@ -5203,13 +6629,18 @@ function renderView() {
   if (state.route !== 'practice' || !state.practice.sessionId) {
     document.body.classList.remove('gal-immersive');
   }
+  document.body.classList.toggle('auth-focus', state.route === 'auth');
   switch (state.route) {
     case 'guide': return renderGuide();
     case 'explain': return renderExplain();
     case 'cases': return renderCases();
     case 'practice': return renderPractice();
     case 'records': return renderRecords();
-    case 'admin': return adminCtrl.render(viewEl, setPage);
+    case 'admin':
+    case 'admin-cases':
+      return adminCtrl.render(viewEl, setPage, 'cases');
+    case 'admin-users':
+      return adminCtrl.render(viewEl, setPage, 'users');
     case 'feedback': return renderFeedback();
     case 'auth': return renderAuth();
     default: return renderGuide();
@@ -5218,10 +6649,16 @@ function renderView() {
 
 function initModal() {
   modal.querySelectorAll('[data-close]').forEach((el) => {
-    el.addEventListener('click', closeModal);
+    el.addEventListener('click', () => {
+      if (modal.classList.contains('is-locked')) return;
+      closeModal();
+    });
   });
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') closeModal();
+    if (e.key === 'Escape') {
+      if (modal.classList.contains('is-locked')) return;
+      closeModal();
+    }
   });
 }
 
@@ -5251,6 +6688,13 @@ async function init() {
       navigate(p.route, p.section, { skipHistory: true });
       navFromHash = false;
     });
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') flushPracticeTimer();
+      else if (state.route === 'practice' && state.practice.sessionId && state.practice.status !== 'completed') {
+        startPracticeTimer();
+      }
+    });
+    window.addEventListener('pagehide', () => flushPracticeTimer());
   } catch (err) {
     viewEl.innerHTML = `<div class="empty">
       <p>数据加载失败。请只用统一入口，并强制刷新（Ctrl+F5）：</p>

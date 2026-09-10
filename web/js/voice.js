@@ -161,17 +161,34 @@ export function createVoiceController({ onFinalTranscript, onTranscriptUpdate, o
     };
 
     recognition.onerror = (e) => {
-      if (e.error === 'not-allowed') {
+      if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
         enabled = false;
         wantListen = false;
         listening = false;
         pendingCommit = false;
         processing = false;
         clearCommitTimer();
-        emit({ error: '麦克风权限被拒绝' });
+        emit({ error: '麦克风权限被拒绝：请在浏览器地址栏允许麦克风后，再打开「语音模式」' });
+        return;
+      }
+      if (e.error === 'audio-capture') {
+        enabled = false;
+        wantListen = false;
+        listening = false;
+        pendingCommit = false;
+        processing = false;
+        clearCommitTimer();
+        emit({ error: '未检测到麦克风，请检查系统输入设备' });
         return;
       }
       if (pendingCommit && e.error === 'aborted') {
+        return;
+      }
+      if (e.error === 'no-speech') {
+        emit({ error: '没听清，请靠近麦克风再说一次' });
+        if (wantListen && enabled && !speaking) {
+          setTimeout(() => startListeningInternal(), 400);
+        }
         return;
       }
       if (wantListen && enabled && !speaking && e.error !== 'aborted') {
@@ -320,7 +337,7 @@ export function createVoiceController({ onFinalTranscript, onTranscriptUpdate, o
     return null;
   }
 
-  async function fetchPatientSpeak(text, personaId, emotion) {
+  async function fetchPatientSpeak(text, personaId, emotion, prosody = {}) {
     const res = await fetch('/api/voice/patient-speak', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -329,6 +346,12 @@ export function createVoiceController({ onFinalTranscript, onTranscriptUpdate, o
         persona_id: personaId || '',
         emotion: emotion || '',
         prefer_talking_video: musetalkEnabled || talkingHeadEnabled,
+        stance: prosody.stance || '',
+        speed: prosody.speed ?? null,
+        vol: prosody.vol ?? null,
+        pitch: prosody.pitch ?? null,
+        pause_sec: prosody.pause_sec ?? null,
+        comma_pause_sec: prosody.comma_pause_sec ?? null,
       }),
     });
     if (res.status === 404) {
@@ -391,7 +414,10 @@ export function createVoiceController({ onFinalTranscript, onTranscriptUpdate, o
   }
 
   async function speakPatientNarration(text, hooks = {}) {
-    const { onAudio, onEnd, onGenerating, onVideo, personaId, emotion } = hooks;
+    const {
+      onAudio, onEnd, onGenerating, onVideo, personaId, emotion,
+      stance, speed, vol, pitch, pause_sec, comma_pause_sec, prosodyLabel,
+    } = hooks;
     if (!text) return false;
 
     const wasWant = wantListen;
@@ -416,8 +442,13 @@ export function createVoiceController({ onFinalTranscript, onTranscriptUpdate, o
     };
 
     try {
-      onGenerating?.({ status: 'tts', message: '正在合成语音…' });
-      const data = await fetchPatientSpeak(text, personaId, emotion);
+      onGenerating?.({
+        status: 'tts',
+        message: prosodyLabel ? `正在合成语音（${prosodyLabel}）…` : '正在合成语音…',
+      });
+      const data = await fetchPatientSpeak(text, personaId, emotion, {
+        stance, speed, vol, pitch, pause_sec, comma_pause_sec,
+      });
       if (abortSpeak) {
         speaking = false;
         emit({ speaking: false });

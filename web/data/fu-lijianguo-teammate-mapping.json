@@ -1,0 +1,71 @@
+{
+  "case_id": "CASE-HTN-PH3-W4-001",
+  "persona": "李建国",
+  "sp_type_teammate": "普通型（配合-回避），兼焦虑/低认知成分",
+  "note": "队友病例表考点映射到现有 FU 小项；不采纳其整数分与关键词≥80%判定",
+  "mappings": [
+    {
+      "teammate_point": "漏服追问具体日期/原因/补服",
+      "fu_ids": [
+        "FU-A01",
+        "FU-C02"
+      ]
+    },
+    {
+      "teammate_point": "不适/头晕与联系中心",
+      "fu_ids": [
+        "FU-A02",
+        "FU-P01"
+      ]
+    },
+    {
+      "teammate_point": "合并用药",
+      "fu_ids": [
+        "FU-A03"
+      ]
+    },
+    {
+      "teammate_point": "药盒数量核对",
+      "fu_ids": [
+        "FU-A04"
+      ]
+    },
+    {
+      "teammate_point": "服药日记真实性",
+      "fu_ids": [
+        "FU-A05"
+      ]
+    },
+    {
+      "teammate_point": "家庭血压",
+      "fu_ids": [
+        "FU-A06"
+      ]
+    },
+    {
+      "teammate_point": "非责备沟通",
+      "fu_ids": [
+        "FU-C01"
+      ]
+    },
+    {
+      "teammate_point": "勿自行停药/补服",
+      "fu_ids": [
+        "FU-P02",
+        "FU-X02"
+      ]
+    },
+    {
+      "teammate_point": "责备恐吓红线",
+      "fu_ids": [
+        "FU-X01"
+      ]
+    },
+    {
+      "teammate_point": "下次随访与联系方式",
+      "fu_ids": [
+        "FU-P03"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "meta": {
+    "scene_key": "informed_consent",
+    "disease_code": "HTN",
+    "version": "1.0.0",
+    "basedOnSceneRubric": "scoring-rubric.json",
+    "changelog": "高血压知情：L1 50%→52%、关切 30%→28%；侧重点对齐心血管风险与合并用药"
+  },
+  "scoringModelPatch": {
+    "dimensions": [
+      { "id": "redline", "weight": 0, "isGate": true },
+      { "id": "L1", "weight": 0.52 },
+      { "id": "L2", "weight": 0.2 },
+      { "id": "concern", "weight": 0.28 }
+    ]
+  },
+  "itemOverrides": [
+    { "id": "IC-C04", "enabledMvp": true, "reason": "心血管相关风险须讲清" },
+    { "id": "IC-C13", "enabledMvp": true, "reason": "急救/联系方式对本品重要" }
+  ],
+  "emphasis": {
+    "traineeBrief": "本局侧重：试验目的、血压相关风险与不便、合并用药与联系方式、退出权。",
+    "instructorNote": "相对通用知情表，L1 略增，强调内容讲清。"
+  }
+}

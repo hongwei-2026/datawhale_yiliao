@@ -1,0 +1,299 @@
+{
+  "meta": {
+    "case_id": "CASE-ADM-CUSTOM-1C64F9",
+    "title": "周阿姨 · 家属协同沟通",
+    "short_title": "周阿姨 · 家属协同沟通",
+    "data_status": "reviewed",
+    "version": "0.1.0",
+    "phase": "II",
+    "locale": "zh-CN",
+    "is_default": false,
+    "mvp_scenes": [
+      "S1"
+    ],
+    "source_refs": [
+      {
+        "type": "admin_ingest",
+        "title": "用户大概",
+        "note": "mode=rough; draft=DRAFT-D5F36CE2-E; scoring_fallback=informed_consent"
+      }
+    ],
+    "disclaimer": "本病例为教学模拟 SP 案例，由管理端审核发布。"
+  },
+  "disease": {
+    "disease_code": "COPD",
+    "name_zh": "慢性阻塞性肺疾病",
+    "icd10": null,
+    "description": "吸入剂试验随访用 · 闭环测试病种",
+    "introduction": "慢阻肺（COPD）以持续气流受限为特征，常见气短、慢性咳嗽咳痰。吸入剂试验随访时，受试者可能漏吸、自行买止咳/感冒药，怕被说不配合或踢出试验。沟通应贴合呼吸与吸入器使用体验，平和追问漏吸原因与合并用药，勿串成高血压量血压或糖尿病测血糖话术。"
+  },
+  "protocol": {
+    "protocol_code": "PROTO-COPD-ADM",
+    "title": "慢性阻塞性肺疾病试验方案（管理端接入）",
+    "phase": "II",
+    "is_placeholder": true,
+    "status": "active"
+  },
+  "session_script": {
+    "scene_key": "家属协同沟通",
+    "scene_label": "家属协同沟通",
+    "scene_codes": [
+      "S1"
+    ],
+    "scoring_scene_key": "informed_consent",
+    "visit_context": "周阿姨今天带着女儿来做沟通：家属担心试验风险与跑医院次数，本人慢阻肺吸入试验第6周，客气回避漏吸与自行买药，需同时安抚双方并问清实情。",
+    "system_opening": "你正在进行家属协同沟通训练。受试者：周阿姨。",
+    "patient_greeting": "大夫，我是周阿姨，我女儿也来了，她有点担心。",
+    "patient_greeting_seeds": [
+      "大夫，我是周阿姨，我女儿也来了，她有点担心。",
+      "孙子还在外面等，咱们快点问行吗？药我都在吸。"
+    ],
+    "opening_themes": [
+      "家属担心风险",
+      "怕被批评",
+      "少跑医院"
+    ],
+    "trainee_role_hint": "家属在场时：同时安抚家属关切、把试验要点讲清；不要只顾一方，也不要一开始责备。"
+  },
+  "clinical_summary": {
+    "chief_complaint": "周阿姨今天带着女儿来做沟通：家属担心试验风险与跑医院次数，本人慢阻肺吸入试验第6周，客气回避漏吸与自行买药，需同时安抚双方并问清实情。",
+    "history_present": [
+      "过去两周漏吸约3次（顾孙子、出门忘带吸入器）",
+      "自己买过感冒药和止咳糖浆，日记有两天是补记的",
+      "气短比上个月略重，但没主动说",
+      "女儿在场，担心妈妈被踢出试验、听不懂医学词",
+      "怕说漏吸被骂，想问能不能电话随访少跑医院"
+    ],
+    "history_past": [],
+    "social_notes": "退休纺织厂工人，在家带孙子；慢阻肺吸入试验受试者，女儿陪同来访。"
+  },
+  "adherence_facts": {
+    "missed_doses": [],
+    "note": "见锁死事实"
+  },
+  "symptoms": [
+    {
+      "symptom_id": "SYM-ADM-01",
+      "name": "过去两周漏吸约3次（顾孙子、出门忘带吸入器）",
+      "is_core": true,
+      "present": true,
+      "lay_description": "过去两周漏吸约3次（顾孙子、出门忘带吸入器）",
+      "source": "admin_ingest_locked_fact"
+    },
+    {
+      "symptom_id": "SYM-ADM-02",
+      "name": "自己买过感冒药和止咳糖浆，日记有两天是补记的",
+      "is_core": true,
+      "present": true,
+      "lay_description": "自己买过感冒药和止咳糖浆，日记有两天是补记的",
+      "source": "admin_ingest_locked_fact"
+    },
+    {
+      "symptom_id": "SYM-ADM-03",
+      "name": "气短比上个月略重，但没主动说",
+      "is_core": true,
+      "present": true,
+      "lay_description": "气短比上个月略重，但没主动说",
+      "source": "admin_ingest_locked_fact"
+    },
+    {
+      "symptom_id": "SYM-ADM-04",
+      "name": "女儿在场，担心妈妈被踢出试验、听不懂医学词",
+      "is_core": true,
+      "present": true,
+      "lay_description": "女儿在场，担心妈妈被踢出试验、听不懂医学词",
+      "source": "admin_ingest_locked_fact"
+    },
+    {
+      "symptom_id": "SYM-ADM-05",
+      "name": "怕说漏吸被骂，想问能不能电话随访少跑医院",
+      "is_core": true,
+      "present": true,
+      "lay_description": "怕说漏吸被骂，想问能不能电话随访少跑医院",
+      "source": "admin_ingest_locked_fact"
+    }
+  ],
+  "concomitant_events": [],
+  "inclusion_hints": [],
+  "exclusion_hints": [],
+  "comorbidities": [],
+  "medication": {
+    "investigational_summary": "",
+    "concomitant_drugs": []
+  },
+  "risks": [
+    {
+      "risk_id": "RISK-ADM-01",
+      "title": "担心与信任",
+      "must_disclose": false,
+      "description": "输入中出现怕/担心类表述"
+    }
+  ],
+  "benefits": [],
+  "visits": [
+    {
+      "visit_id": "V-ADM-01",
+      "name": "家属协同沟通",
+      "timing": "周阿姨今天带着女儿来做沟通：家属担心试验风险与跑医院次数，本人慢阻肺吸入试验第6周，客气回避漏吸与自行买药，需同时安抚双方并问清实情。",
+      "procedures": [
+        "周阿姨今天带着女儿来做沟通：家属担心试验风险与跑医院次数，本人慢阻肺吸入试验第6周，客气回避漏吸与自行买药，需同时安抚双方并问清实情。"
+      ]
+    }
+  ],
+  "lab_hints": [],
+  "forbidden_fabrications": [
+    {
+      "forbidden_id": "FB-ADM-01",
+      "category": "claim",
+      "description": "不得编造未登记的严重不良事件",
+      "remediating_reply": "这个我不太清楚，您再问问研究医生吧。"
+    }
+  ],
+  "persona": {
+    "persona_id": "PER-ADM-2BEE88EC",
+    "display_name": "周阿姨",
+    "display_label": "周阿姨",
+    "age_years": 58,
+    "sex": "female",
+    "emotion_baseline": "anxious_mild",
+    "concealment_tendency": "moderate",
+    "occupation": "退休纺织厂工人",
+    "lay_bio": "58岁退休女工，在家带孙子；慢阻肺吸入试验第6周，今天女儿陪同来沟通。"
+  },
+  "key_concerns": [
+    {
+      "concern_id": "KC-ADM-01",
+      "topic": "家属担心风险",
+      "patient_may_ask": [],
+      "researcher_should_cover": "女儿担心试验不安全、跑医院太多",
+      "disclosure_rule": "女儿担心试验不安全、跑医院太多",
+      "source": "admin_fix",
+      "reason": "闭环病例可读摘要"
+    },
+    {
+      "concern_id": "KC-ADM-02",
+      "topic": "怕被批评",
+      "patient_may_ask": [],
+      "researcher_should_cover": "怕说漏吸被骂或不被理解",
+      "disclosure_rule": "怕说漏吸被骂或不被理解",
+      "source": "admin_fix",
+      "reason": "闭环病例可读摘要"
+    },
+    {
+      "concern_id": "KC-ADM-03",
+      "topic": "少跑医院",
+      "patient_may_ask": [],
+      "researcher_should_cover": "想问能不能电话随访",
+      "disclosure_rule": "想问能不能电话随访",
+      "source": "admin_fix",
+      "reason": "闭环病例可读摘要"
+    }
+  ],
+  "dialogue_hints": {
+    "if_blame": {
+      "trigger_patterns": [
+        "责备",
+        "怎么能"
+      ],
+      "response": "我也不是故意的…",
+      "behavior": "更短、更防备",
+      "source": "none",
+      "reason": "默认接话倾向；路径丙若用户未写则保持模板并标来源"
+    }
+  },
+  "ingest_meta": {
+    "draft_id": "DRAFT-D5F36CE2-E",
+    "mode": "rough",
+    "scoring_hints": [
+      {
+        "text": "练习时需覆盖大类「人文关怀与沟通」相关沟通要点",
+        "source": "本场景评分清单 · G-01 人文关怀与沟通",
+        "reason": "病例挂靠已有场景，评分不新造；此条为挂钩说明而非新得分点",
+        "confidence": "high",
+        "rubric_group_id": "G-01",
+        "rubric_group_name": "人文关怀与沟通"
+      },
+      {
+        "text": "练习时需覆盖大类「试验内容与风险获益」相关沟通要点",
+        "source": "本场景评分清单 · G-02 试验内容与风险获益",
+        "reason": "病例挂靠已有场景，评分不新造；此条为挂钩说明而非新得分点",
+        "confidence": "high",
+        "rubric_group_id": "G-02",
+        "rubric_group_name": "试验内容与风险获益"
+      },
+      {
+        "text": "练习时需覆盖大类「回应受试者关切」相关沟通要点",
+        "source": "本场景评分清单 · G-03 回应受试者关切",
+        "reason": "病例挂靠已有场景，评分不新造；此条为挂钩说明而非新得分点",
+        "confidence": "high",
+        "rubric_group_id": "G-03",
+        "rubric_group_name": "回应受试者关切"
+      },
+      {
+        "text": "练习时需覆盖大类「流程权利与安排」相关沟通要点",
+        "source": "本场景评分清单 · G-04 流程权利与安排",
+        "reason": "病例挂靠已有场景，评分不新造；此条为挂钩说明而非新得分点",
+        "confidence": "high",
+        "rubric_group_id": "G-04",
+        "rubric_group_name": "流程权利与安排"
+      }
+    ],
+    "locked_facts_annotated": [
+      {
+        "text": "过去两周漏吸约3次（顾孙子、出门忘带吸入器）",
+        "source": "admin_fix",
+        "reason": "可读事实",
+        "confidence": "high"
+      },
+      {
+        "text": "自己买过感冒药和止咳糖浆，日记有两天是补记的",
+        "source": "admin_fix",
+        "reason": "可读事实",
+        "confidence": "high"
+      },
+      {
+        "text": "气短比上个月略重，但没主动说",
+        "source": "admin_fix",
+        "reason": "可读事实",
+        "confidence": "high"
+      },
+      {
+        "text": "女儿在场，担心妈妈被踢出试验、听不懂医学词",
+        "source": "admin_fix",
+        "reason": "可读事实",
+        "confidence": "high"
+      },
+      {
+        "text": "怕说漏吸被骂，想问能不能电话随访少跑医院",
+        "source": "admin_fix",
+        "reason": "可读事实",
+        "confidence": "high"
+      }
+    ],
+    "openings_annotated": [
+      {
+        "text": "大夫，我是周阿姨，我女儿也来了，她有点担心。",
+        "source": "admin_fix",
+        "reason": "开场",
+        "confidence": "high"
+      },
+      {
+        "text": "孙子还在外面等，咱们快点问行吗？药我都在吸。",
+        "source": "admin_fix",
+        "reason": "开场",
+        "confidence": "high"
+      }
+    ]
+  },
+  "scoring": {
+    "disease_code": "COPD",
+    "scene_key": "informed_consent",
+    "rubric_ref": "scoring-rubric.json",
+    "overlay_key": "informed_consent|COPD",
+    "emphasis": {
+      "patientStance": "本场为家属协同沟通·慢性阻塞性肺疾病；言行贴合该病种与访视任务"
+    },
+    "pack_version": "1.1.0-mvp+groups",
+    "overlay_applied": false
+  }
+}

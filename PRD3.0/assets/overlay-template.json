@@ -1,0 +1,32 @@
+{
+  "meta": {
+    "scene_key": "follow_up",
+    "disease_code": "REPLACE_ME",
+    "version": "0.1.0-draft",
+    "basedOnSceneRubric": "scoring-rubric-followup.json",
+    "changelog": "说明相对通用场景表改了什么（必填）"
+  },
+  "scoringModelPatch": {
+    "dimensions": [
+      { "id": "L1", "weight": 0.55 },
+      { "id": "L2", "weight": 0.25 },
+      { "id": "communication", "weight": 0.2 }
+    ]
+  },
+  "itemOverrides": [
+    {
+      "id": "EXAMPLE-ITEM-ID",
+      "enabledMvp": true,
+      "reason": "本品种必考"
+    },
+    {
+      "id": "EXAMPLE-ITEM-ID-2",
+      "enabledMvp": false,
+      "reason": "非本品种考点，避免噪声"
+    }
+  ],
+  "emphasis": {
+    "traineeBrief": "开练给学员看的一句侧重点",
+    "instructorNote": "给带教看的标定说明"
+  }
+}

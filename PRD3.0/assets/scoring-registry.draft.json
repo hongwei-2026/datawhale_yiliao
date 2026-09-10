@@ -1,0 +1,53 @@
+{
+  "version": "3.0-draft",
+  "note": "评分注册表草案。P1 引擎读此文件；当前生产仍走 case_loader.RUBRIC_BY_SCENE。详见 PRD3.0/04-场景与病种评分设计方案.md",
+  "scenes": {
+    "informed_consent": {
+      "label": "知情同意",
+      "rubric": "scoring-rubric.json",
+      "status": "production",
+      "clonedFrom": null
+    },
+    "follow_up": {
+      "label": "随访（询问）",
+      "rubric": "scoring-rubric-followup.json",
+      "status": "production",
+      "clonedFrom": null
+    }
+  },
+  "overlays": {
+    "follow_up|HTN": {
+      "path": "scoring/overlays/follow_up__HTN.json",
+      "status": "planned",
+      "note": "高血压随访侧重点：漏服、血压监测、合并降压药"
+    },
+    "follow_up|T2DM": {
+      "path": "scoring/overlays/follow_up__T2DM.json",
+      "status": "planned",
+      "note": "糖尿病随访侧重点：低血糖、用药时点"
+    },
+    "informed_consent|T2DM": {
+      "path": "scoring/overlays/informed_consent__T2DM.json",
+      "status": "planned",
+      "note": "糖尿病知情：代谢风险与长期义务侧重点"
+    },
+    "informed_consent|HTN": {
+      "path": "scoring/overlays/informed_consent__HTN.json",
+      "status": "planned",
+      "note": "高血压知情：心血管风险与合并用药侧重点"
+    }
+  },
+  "rules": {
+    "missingOverlay": "use_scene_rubric_and_flag_warning",
+    "publishRequiresRubric": true,
+    "newSceneRequiresClone": true,
+    "foundation": {
+      "verdictPoints": { "pass": 1.0, "uncertain": 0.5, "fail": 0.0 },
+      "defaultPassScore": 60,
+      "minTraineeTurns": 3,
+      "minTraineeChars": 120,
+      "primaryFeedback": "checklist",
+      "scoreRole": "teaching_reference"
+    }
+  }
+}

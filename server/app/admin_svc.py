@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import base64
 import json
 import shutil
+import urllib.error
+import urllib.request
 from pathlib import Path
 from typing import Any
 
@@ -15,6 +18,7 @@ from .case_loader import (
     invalidate_case_caches,
     load_cases_index,
 )
+from .config import get_settings
 from .db import connect, new_id, utc_now
 
 SCENES_PATH = ROOT / "web" / "data" / "scenes.json"
@@ -24,6 +28,22 @@ PORTRAITS_DIR = ROOT / "web" / "live2d" / "portraits"
 ADMIN_USERNAME = "admin"
 ADMIN_DEFAULT_PASSWORD = "Admin2026"
 ADMIN_DISPLAY_NAME = "系统管理员"
+
+PORTRAIT_PROMPTS = {
+    "PER-HTN-TAXI-01": (
+        "中国中年男性出租车司机半身像，写实插画，略疲惫但友善，"
+        "深色夹克，社区医院随访场景光，上半身，无文字水印，"
+        "galgame 视觉小说立绘风格，柔和背景"
+    ),
+    "PER-ELDER-BASIC-01": (
+        "中国老年男性患者半身像，写实温暖，花白短发，朴素衬衫，"
+        "和蔼略带疑虑，社区医院随访，上半身，无文字，galgame 立绘"
+    ),
+    "PER-ELDER-FEMALE-02": (
+        "中国老年女性患者半身像，写实柔和，短发，浅色开衫，"
+        "亲切朴实，社区医院随访，上半身，无文字，galgame 立绘"
+    ),
+}
 
 
 def ensure_admin_user(db_path: str) -> dict[str, Any]:
@@ -293,7 +313,7 @@ def import_case_package(payload: dict[str, Any]) -> dict[str, Any]:
 
     idx = load_cases_index()
     disease = payload.get("disease") or {}
-    disease_code = disease.get("disease_code") or meta.get("disease_code") or "CUSTOM"
+    disease_code = disease.get("disease_code") or meta.get("disease_code") or "T2DM"
     disease_name = disease.get("name_zh") or disease_code
     short_title = meta.get("short_title") or meta.get("title") or case_id
     title = meta.get("title") or short_title
@@ -434,6 +454,10 @@ def upsert_scene(scene: dict[str, Any]) -> dict[str, Any]:
     name = (scene.get("name") or scene.get("title") or sid).strip()
     description = (scene.get("description") or scene.get("summary") or "").strip()
     code = (scene.get("code") or "").strip()
+    tier_raw = str(scene.get("tier") or "").strip().lower()
+    if tier_raw not in ("test", "formal"):
+        # 未传时：新建默认 test；更新时保留原值
+        tier_raw = ""
     entry = {
         "id": sid,
         "code": code or None,
@@ -446,21 +470,41 @@ def upsert_scene(scene: dict[str, Any]) -> dict[str, Any]:
         "enabled": scene.get("enabled", True),
         "primaryStandards": scene.get("primaryStandards") or ["gcp-2020"],
     }
+    if tier_raw in ("test", "formal"):
+        entry["tier"] = tier_raw
+        if tier_raw == "formal":
+            entry["statusLabel"] = scene.get("statusLabel") or "正式"
+        elif not scene.get("statusLabel"):
+            entry["statusLabel"] = "测试"
     # 去掉空 code，避免污染
     if not entry["code"]:
         entry.pop("code", None)
     hit = next((s for s in scenes if (s.get("id") or s.get("scene_key")) == sid), None)
     if hit:
-        # 保留原有 standards / status，除非调用方显式传入
-        for keep in ("primaryStandards", "status", "statusLabel"):
+        # 保留原有 standards / status / tier，除非调用方显式传入
+        for keep in ("primaryStandards", "status", "statusLabel", "tier"):
+            if keep == "tier" and tier_raw in ("test", "formal"):
+                continue
             if keep not in scene and hit.get(keep) is not None:
                 entry[keep] = hit[keep]
+        if "tier" not in entry and hit.get("tier"):
+            entry["tier"] = hit["tier"]
         hit.clear()
         hit.update(entry)
     else:
+        if "tier" not in entry:
+            entry["tier"] = "test"
+            entry["statusLabel"] = entry.get("statusLabel") or "测试"
         scenes.append(entry)
     _write_json(SCENES_PATH, raw)
-    return {"ok": True, "scene": entry}
+    refreshed = 0
+    try:
+        from . import case_ingest
+
+        refreshed = case_ingest.refresh_draft_hooks_for_scene(sid)
+    except Exception:
+        refreshed = 0
+    return {"ok": True, "scene": entry, "refreshed_drafts": refreshed}
 
 
 def delete_scene(scene_id: str) -> dict[str, Any]:
@@ -491,6 +535,236 @@ def _portrait_label(filename: str, persona_labels: dict[str, str]) -> str:
     return friendly.get(stem, stem)
 
 
+def _portrait_public_url(path: str | None) -> str:
+    """给前端可稳定刷新的肖像 URL（带文件 mtime 防缓存读坏）。"""
+    if not path:
+        return ""
+    raw = str(path).split("?", 1)[0]
+    name = Path(raw).name
+    if not name:
+        return str(path)
+    local = PORTRAITS_DIR / name
+    if local.is_file():
+        return f"/live2d/portraits/{name}?v={int(local.stat().st_mtime)}"
+    if raw.startswith("/"):
+        return raw
+    return f"/live2d/portraits/{name}"
+
+
+def _minimax_image_bytes(*, prompt: str, aspect_ratio: str = "3:4") -> bytes:
+    settings = get_settings()
+    key = (settings.minimax_api_key or "").strip()
+    if not key or key == "your_key_here":
+        raise RuntimeError("未配置 MINIMAX_API_KEY，无法 AI 生成立绘")
+    base = (settings.minimax_base_url or "https://api.minimaxi.com/v1").rstrip("/")
+    url = f"{base}/image_generation"
+    payload = {
+        "model": "image-01",
+        "prompt": prompt,
+        "aspect_ratio": aspect_ratio,
+        "response_format": "base64",
+        "n": 1,
+    }
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {key}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=120) as res:
+            data = json.loads(res.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        body = exc.read().decode("utf-8", errors="replace")[:400]
+        raise RuntimeError(f"MiniMax HTTP {exc.code}: {body}") from exc
+
+    base_resp = data.get("base_resp") or {}
+    if base_resp.get("status_code") not in (None, 0):
+        raise RuntimeError(base_resp.get("status_msg") or f"MiniMax 错误: {data}")
+
+    images = (data.get("data") or {}).get("image_base64") or []
+    if images:
+        return base64.b64decode(images[0])
+    urls = (data.get("data") or {}).get("image_urls") or []
+    if urls:
+        with urllib.request.urlopen(urls[0], timeout=60) as img_res:
+            return img_res.read()
+    raise RuntimeError(f"无图片数据: {json.dumps(data, ensure_ascii=False)[:400]}")
+
+
+def _save_portrait_bytes(raw: bytes, dest: Path) -> Path:
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        from PIL import Image
+        import io
+
+        img = Image.open(io.BytesIO(raw)).convert("RGB")
+        if dest.suffix.lower() != ".webp":
+            dest = dest.with_suffix(".webp")
+        img.save(dest, "WEBP", quality=88, method=6)
+        return dest
+    except ImportError:
+        dest = dest.with_suffix(".jpg")
+        dest.write_bytes(raw)
+        return dest
+
+
+def generate_ai_portrait(
+    *,
+    persona_id: str,
+    prompt: str | None = None,
+    display_hint: str | None = None,
+    bind: bool = True,
+) -> dict[str, Any]:
+    """用 MiniMax image-01 生成受试者立绘并写入形象库。"""
+    from re import sub
+
+    pid = (persona_id or "").strip()
+    if not pid:
+        return {"ok": False, "error": "缺少 persona_id"}
+    safe = sub(r"[^\w\-]+", "_", pid)[:48] or "portrait"
+    hint = (display_hint or "").strip()
+    profile = _load_persona_profile(pid)
+    use_prompt = _build_portrait_prompt(pid, prompt=prompt, display_hint=hint, profile=profile)
+    try:
+        raw = _minimax_image_bytes(prompt=use_prompt, aspect_ratio="3:4")
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
+
+    out = _save_portrait_bytes(raw, PORTRAITS_DIR / f"{safe}.webp")
+    static_portraits = ROOT / "server" / "app" / "static" / "live2d" / "portraits"
+    if static_portraits.parent.exists():
+        try:
+            static_portraits.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(out, static_portraits / out.name)
+        except OSError:
+            pass
+
+    public = f"/live2d/portraits/{out.name}"
+    public_bust = _portrait_public_url(public)
+    result: dict[str, Any] = {
+        "ok": True,
+        "path": public,
+        "path_bust": public_bust,
+        "file": out.name,
+        "prompt": use_prompt,
+        "label": _portrait_label(out.name, {pid: profile.get("display_label") or hint} if (profile or hint) else {}),
+        "message": "立绘已生成",
+        "profile_used": {
+            "display_label": profile.get("display_label"),
+            "age_years": profile.get("age_years"),
+            "sex": profile.get("sex"),
+            "occupation": profile.get("occupation"),
+        },
+    }
+    if bind:
+        bind_res = update_avatar_binding(persona_id=pid, portrait_path=public)
+        if not bind_res.get("ok"):
+            return bind_res
+        result["bound"] = True
+        result["persona_id"] = pid
+    return result
+
+
+def _load_persona_profile(persona_id: str) -> dict[str, Any]:
+    """从病例 JSON 读取人设，供立绘提示词使用。"""
+    pid = (persona_id or "").strip()
+    if not pid or not CASES_DIR.is_dir():
+        return {}
+    for path in CASES_DIR.glob("*.json"):
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        persona = data.get("persona") or {}
+        if persona.get("persona_id") == pid:
+            return dict(persona)
+        for p in data.get("personas") or []:
+            if isinstance(p, dict) and p.get("persona_id") == pid:
+                return dict(p)
+    return {}
+
+
+def _infer_sex_zh(profile: dict[str, Any], hint: str = "") -> str:
+    sex = (profile.get("sex") or "").lower()
+    if sex in ("female", "f", "女"):
+        return "女性"
+    if sex in ("male", "m", "男"):
+        return "男性"
+    blob = f"{profile.get('display_label') or ''} {profile.get('occupation') or ''} {hint}"
+    if any(k in blob for k in ("女", "阿姨", "秀英", "姐", "妇")):
+        return "女性"
+    if any(k in blob for k in ("男", "大爷", "叔叔", "师傅", "司机")):
+        return "男性"
+    return "成人"
+
+
+def _occupation_zh(occ: Any) -> str:
+    raw = str(occ or "").strip()
+    if not raw:
+        return ""
+    mapping = {
+        "taxi_driver": "出租车司机",
+        "retired": "退休人员",
+        "factory_worker": "工厂工人",
+        "farmer": "务农",
+    }
+    return mapping.get(raw, raw)
+
+
+def _build_portrait_prompt(
+    persona_id: str,
+    *,
+    prompt: str | None,
+    display_hint: str | None,
+    profile: dict[str, Any],
+) -> str:
+    custom = (prompt or "").strip()
+    if custom:
+        return custom
+    hint = (display_hint or "").strip()
+    label = (profile.get("display_label") or hint or persona_id).strip()
+    age = profile.get("age_years")
+    age_s = f"{age}岁" if age else ""
+    sex_zh = _infer_sex_zh(profile, hint)
+    occ_zh = _occupation_zh(profile.get("occupation"))
+    bio = str(profile.get("lay_bio") or "").strip()
+    # 气质：去掉明显病情/漏服细节，只留性格口吻线索
+    vibe = bio
+    for cut in ("漏服", "服药", "头晕", "抽血", "副作用", "试验", "日记", "合并用药"):
+        if cut in vibe:
+            # 截到首个病情词之前，避免立绘被「病历」带偏
+            vibe = vibe.split(cut, 1)[0].rstrip("，,；;。 ")
+            break
+    vibe = vibe[:80] if vibe else ""
+    # 若气质太空，用职业+称呼兜底
+    if not vibe and (occ_zh or label):
+        vibe = f"{occ_zh or ''}，日常朴实，略紧张配合".strip("，")
+    parts = [
+        "中国人半身立绘肖像，单人特写，胸部以上，干净背景或浅色虚化诊室，",
+        f"{age_s}{sex_zh}" if (age_s or sex_zh) else "中老年受试者",
+        "，",
+    ]
+    if occ_zh:
+        parts.append(f"身份/职业：{occ_zh}，穿着符合该身份的朴素日常服装，")
+    parts.append(f"人物需一眼符合「{label}」，")
+    if vibe:
+        parts.append(f"气质参考（不要把文字画进图里）：{vibe}。")
+    parts.append(
+        "社区医院随访柔和室内光，写实插画/视觉小说立绘，表情自然略紧张或配合，"
+        "五官清晰，不要网红脸，无文字、无水印、无多人、无夸张妆造。"
+    )
+    if hint and hint not in label:
+        parts.append(f"老师补充外貌要求：{hint}。")
+    # 仅当完全没有病例人设、且是预设 ID 时，才退回模板
+    if not profile and persona_id in PORTRAIT_PROMPTS and not hint:
+        return PORTRAIT_PROMPTS[persona_id]
+    return "".join(parts)
+
+
 def list_avatars() -> dict[str, Any]:
     manifest = {}
     if LIVE2D_MANIFEST.exists():
@@ -506,8 +780,10 @@ def list_avatars() -> dict[str, Any]:
                 pid = p.get("persona_id")
                 if not pid:
                     continue
-                label = p.get("display_label") or pid
+                profile = _load_persona_profile(pid)
+                label = profile.get("display_label") or p.get("display_label") or pid
                 persona_labels[pid] = label
+                portrait = (manifest.get("portraits") or {}).get(pid)
                 personas.append({
                     "persona_id": pid,
                     "display_label": label,
@@ -515,8 +791,13 @@ def list_avatars() -> dict[str, Any]:
                     "case_title": case_title,
                     "visual": (manifest.get("persona_visual") or {}).get(pid)
                     or manifest.get("default_visual"),
-                    "portrait": (manifest.get("portraits") or {}).get(pid),
+                    "portrait": portrait,
+                    "portrait_url": _portrait_public_url(portrait),
                     "model": persona_map.get(pid),
+                    "age_years": profile.get("age_years"),
+                    "sex": profile.get("sex"),
+                    "occupation": profile.get("occupation"),
+                    "lay_bio": (profile.get("lay_bio") or "")[:160],
                 })
 
     # 形象库：优先 webp，同 stem 去重
@@ -534,7 +815,8 @@ def list_avatars() -> dict[str, Any]:
             if stem in seen_stems:
                 continue
             seen_stems.add(stem)
-            path = f"/live2d/portraits/{p.name}"
+            bust = int(p.stat().st_mtime)
+            path = f"/live2d/portraits/{p.name}?v={bust}"
             gallery.append({
                 "file": p.name,
                 "path": path,
@@ -652,3 +934,49 @@ def update_avatar_binding(
         except OSError:
             pass
     return {"ok": True, "persona_id": persona_id}
+
+
+def ensure_persona_portrait(
+    persona_id: str,
+    *,
+    sex: str | None = None,
+    display_hint: str | None = None,
+) -> dict[str, Any]:
+    """发布后保证有可访问的立绘文件；缺文件时按性别复制默认肖像并写入 manifest。"""
+    from re import sub
+
+    pid = (persona_id or "").strip()
+    if not pid:
+        return {"ok": False, "error": "缺少 persona_id"}
+    safe = sub(r"[^\w\-]+", "_", pid)[:48] or "portrait"
+    dest = PORTRAITS_DIR / f"{safe}.webp"
+    if dest.exists() and dest.stat().st_size > 0:
+        public = f"/live2d/portraits/{dest.name}"
+        update_avatar_binding(persona_id=pid, visual="live2d", portrait_path=public)
+        return {"ok": True, "path": public, "created": False}
+
+    sex_zh = _infer_sex_zh({"sex": sex or ""}, display_hint or "")
+    fallback_name = (
+        "PER-ELDER-FEMALE-02.webp" if sex_zh == "女性" else "PER-ELDER-BASIC-01.webp"
+    )
+    # 优先用已有管理端立绘
+    for candidate in (
+        "PER-ADM-61A93613.webp" if sex_zh == "女性" else "PER-ADM-02F6DA23.webp",
+        fallback_name,
+        "PER-HTN-TAXI-01.webp",
+    ):
+        src = PORTRAITS_DIR / candidate
+        if src.exists() and src.stat().st_size > 0:
+            PORTRAITS_DIR.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src, dest)
+            static_portraits = ROOT / "server" / "app" / "static" / "live2d" / "portraits"
+            if static_portraits.parent.exists():
+                try:
+                    static_portraits.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(dest, static_portraits / dest.name)
+                except OSError:
+                    pass
+            public = f"/live2d/portraits/{dest.name}"
+            update_avatar_binding(persona_id=pid, visual="live2d", portrait_path=public)
+            return {"ok": True, "path": public, "created": True, "from": candidate}
+    return {"ok": False, "error": "找不到可用的默认立绘"}

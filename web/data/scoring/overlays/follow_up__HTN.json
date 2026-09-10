@@ -1,0 +1,25 @@
+{
+  "meta": {
+    "scene_key": "follow_up",
+    "disease_code": "HTN",
+    "version": "1.0.0",
+    "basedOnSceneRubric": "scoring-rubric-followup.json",
+    "changelog": "高血压随访：L1 核查权重 55%→60%；突出家庭血压记录；侧重点文案对齐漏服/血压监测"
+  },
+  "scoringModelPatch": {
+    "dimensions": [
+      { "id": "redline", "weight": 0, "isGate": true },
+      { "id": "L1", "weight": 0.6 },
+      { "id": "L2", "weight": 0.2 },
+      { "id": "communication", "weight": 0.2 }
+    ]
+  },
+  "itemOverrides": [
+    { "id": "FU-A06", "enabledMvp": true, "reason": "高血压随访必核家庭血压记录" },
+    { "id": "FU-A01", "enabledMvp": true, "reason": "漏服为高血压随访核心" }
+  ],
+  "emphasis": {
+    "traineeBrief": "本局侧重：规律服药与漏服原因、家庭血压监测、合并降压药；避免责备。",
+    "instructorNote": "相对通用随访表，L1 提到 60%，突出核查密度。"
+  }
+}

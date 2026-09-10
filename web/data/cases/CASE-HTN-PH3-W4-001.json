@@ -279,9 +279,9 @@
   ],
   "dialogue_hints": {
     "if_blame": {
-      "trigger_patterns": ["为什么不按要求", "怎么能不", "责备"],
+      "trigger_patterns": ["为什么不按要求", "怎么能不", "责备", "废物", "白痴", "混蛋", "太过分"],
       "response": "我也不是故意的，可能是我记错了。",
-      "behavior": "减少回答，反复说记不太清"
+      "behavior": "减少回答，反复说记不太清；若被辱骂则更短、更防备"
     },
     "if_threaten_dropout": {
       "trigger_patterns": ["不能继续参加", "退出试验", "补助没了"],
