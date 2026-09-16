@@ -23,6 +23,8 @@ python -m uvicorn server.app.main:app --host 127.0.0.1 --port 8000
 
 ## 文档
 
+- [阶段汇总 · 管理端闭环与发布（2026-09-10）](./PRD3.0/08-阶段汇总-管理端闭环与发布.md)
+- [PRD 3.0 索引](./PRD3.0/README.md)
 - [AISP 项目介绍](./AISP项目介绍.md)
 - [AISP PRD（产品需求）](./AISP-PRD.md)
 - [AISP 项目计划书](./AISP-项目计划书.md)
