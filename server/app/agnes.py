@@ -43,33 +43,55 @@ class AgnesClient:
         started = time.perf_counter()
         attempts = max(1, int(retries) + 1)
         last_exc: Exception | None = None
+        last_error: str | None = None
         resp = None
+        data: Any = None
         for attempt in range(attempts):
             try:
                 with httpx.Client(timeout=90.0) as client:
                     resp = client.post(url, headers=headers, json=payload)
-                break
-            except httpx.TimeoutException:
+            except httpx.TimeoutException as exc:
+                last_exc = exc
+                last_error = "AI 响应超时，请稍后重试"
+                if attempt + 1 < attempts:
+                    time.sleep(0.5 * (attempt + 1))
+                    continue
                 latency_ms = int((time.perf_counter() - started) * 1000)
                 return {
                     "ok": False,
                     "status_code": 504,
                     "latency_ms": latency_ms,
-                    "error": "AI 响应超时，请稍后重试",
+                    "error": last_error,
                 }
             except httpx.RequestError as exc:
                 last_exc = exc
+                last_error = f"AI 服务连接失败: {exc}"
                 # DNS / 瞬时断网：短暂退避后重试
                 if attempt + 1 < attempts:
-                    time.sleep(0.4 * (attempt + 1))
+                    time.sleep(0.5 * (attempt + 1))
                     continue
                 latency_ms = int((time.perf_counter() - started) * 1000)
                 return {
                     "ok": False,
                     "status_code": 0,
                     "latency_ms": latency_ms,
-                    "error": f"AI 服务连接失败: {exc}",
+                    "error": last_error,
                 }
+
+            try:
+                data = resp.json()
+            except Exception:
+                data = {"raw_text": resp.text}
+
+            # 限流 / 网关抖动：退避后再试，演示时少打「连不上」
+            if resp.status_code in (408, 429, 500, 502, 503, 504) and attempt + 1 < attempts:
+                last_error = (
+                    (data.get("error") if isinstance(data, dict) else None)
+                    or f"AI 服务暂时不可用({resp.status_code})"
+                )
+                time.sleep(0.6 * (attempt + 1))
+                continue
+            break
 
         if resp is None:
             latency_ms = int((time.perf_counter() - started) * 1000)
@@ -77,15 +99,10 @@ class AgnesClient:
                 "ok": False,
                 "status_code": 0,
                 "latency_ms": latency_ms,
-                "error": f"AI 服务连接失败: {last_exc or 'unknown'}",
+                "error": last_error or f"AI 服务连接失败: {last_exc or 'unknown'}",
             }
 
         latency_ms = int((time.perf_counter() - started) * 1000)
-        try:
-            data = resp.json()
-        except Exception:
-            data = {"raw_text": resp.text}
-
         if resp.status_code >= 400:
             return {
                 "ok": False,
@@ -93,7 +110,11 @@ class AgnesClient:
                 "latency_ms": latency_ms,
                 "request": payload,
                 "response": data,
-                "error": data.get("error") if isinstance(data, dict) else resp.text,
+                "error": (
+                    (data.get("error") if isinstance(data, dict) else None)
+                    or last_error
+                    or resp.text
+                ),
             }
 
         content = _extract_message_content(data)

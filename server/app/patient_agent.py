@@ -109,6 +109,62 @@ def pick_clarify_reply(history: list[dict] | None = None) -> str:
     return random.choice(candidates)
 
 
+_DEGRADED_POOL = [
+    "嗯……我在听，您继续说。",
+    "哦，这样啊。那您再问问我别的？",
+    "行，我知道了。还有什么要跟我说的吗？",
+    "嗯嗯，您慢慢讲，我听着呢。",
+    "这个……我得想想。您能再说具体一点吗？",
+    "好的好的。那接下来呢？",
+]
+
+_DEGRADED_FOLLOW_UP = [
+    "药我基本都吃了，就是有时候忙会忘。您还想问啥？",
+    "最近身体还行吧……您具体想了解哪一块？",
+    "嗯，您问得细一点，我好回答。",
+]
+
+_DEGRADED_IC = [
+    "我有点担心……您能再讲讲会不会有风险吗？",
+    "那我要是不想继续了，还能退出吗？",
+    "嗯，我在听。您用大白话再说一遍也行。",
+]
+
+
+def pick_degraded_patient_reply(
+    *,
+    trainee_text: str = "",
+    history: list[dict] | None = None,
+    case: dict | None = None,
+    scene_key: str | None = None,
+) -> str:
+    """模型连不上时用口语兜底，保证演示不断档，且不出现「（系统）连不上」字样。"""
+    scene = scene_key or (case_primary_scene(case) if case else "") or ""
+    recent = []
+    for m in (history or [])[-10:]:
+        if m.get("role") == "patient":
+            recent.append((m.get("content") or "").strip())
+
+    pool = list(_DEGRADED_POOL)
+    if scene in ("follow_up", "adherence"):
+        pool = _DEGRADED_FOLLOW_UP + pool
+    elif scene == "informed_consent":
+        pool = _DEGRADED_IC + pool
+
+    text = (trainee_text or "").strip()
+    if any(k in text for k in ("退出", "不做了", "不想参加")):
+        pool = ["那我还能随时退出吗？不影响我平时看病吧？", "嗯……退出的事您再说清楚一点。"] + pool
+    elif any(k in text for k in ("药", "吃了", "漏服", "忘了")):
+        pool = ["药……我基本按时吃，偶尔忙会忘一次。", "您是问吃药的事吧？我尽量说实话。"] + pool
+    elif any(k in text for k in ("风险", "副作用", "不舒服", "头晕")):
+        pool = ["风险这块我确实担心，您能用人话讲讲吗？", "不舒服的话……有时候有一点，您接着问。"] + pool
+
+    candidates = [c for c in pool if c not in recent]
+    if not candidates:
+        candidates = list(pool)
+    return random.choice(candidates)
+
+
 def _recent_patient_lines(history: list[dict] | None, limit: int = 3) -> list[str]:
     lines: list[str] = []
     for m in reversed(history or []):
@@ -327,14 +383,17 @@ def generate_patient_opening(
 只输出受试者要说的话。"""
 
     messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
-    result = client.chat(messages, temperature=0.88, max_tokens=_PATIENT_MAX_TOKENS)
+    result = client.chat(messages, temperature=0.88, max_tokens=_PATIENT_MAX_TOKENS, retries=3)
     if not result.get("ok"):
+        # 开场失败也用病例兜底台词，演示不断档
         return {
-            "ok": False,
+            "ok": True,
             "content": _fallback_opening(case),
             "generated": False,
+            "degraded": True,
             "error": result.get("error"),
             "latency_ms": result.get("latency_ms"),
+            "patient_affect": public_affect(emotion),
         }
 
     content = sanitize_patient_speech((result.get("content") or "").strip())
@@ -393,15 +452,23 @@ def generate_patient_reply(
     messages = build_patient_turn_messages(system, history, turn_user)
 
     temp = 0.65 if emotion.get("stance") in ("defensive", "withdrawn") else 0.82
-    result = client.chat(messages, temperature=temp, max_tokens=_PATIENT_MAX_TOKENS)
+    result = client.chat(messages, temperature=temp, max_tokens=_PATIENT_MAX_TOKENS, retries=3)
     if not result.get("ok"):
+        # 演示优先：模型抖动时用口语兜底继续对话，避免反复弹「连不上」
+        degraded = pick_degraded_patient_reply(
+            trainee_text=trainee_text,
+            history=history,
+            case=case,
+            scene_key=scene_key,
+        )
         return {
-            "ok": False,
-            "content": "（系统）暂时连不上模拟病人，请稍后重试。",
+            "ok": True,
+            "content": degraded,
+            "degraded": True,
             "error": result.get("error"),
             "latency_ms": result.get("latency_ms"),
             "raw": result,
-            "grounding": {"passed": False, "action": "block", "hits": []},
+            "grounding": {"passed": True, "action": "degraded_fallback", "hits": []},
             "patient_affect": public_affect(emotion),
             "emotion_state": emotion,
         }

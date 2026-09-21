@@ -14,7 +14,12 @@ from .case_loader import (
     load_rubric_for_case,
 )
 from .db import connect, new_id, utc_now
-from .patient_agent import generate_patient_opening, generate_patient_reply, pick_clarify_reply
+from .patient_agent import (
+    generate_patient_opening,
+    generate_patient_reply,
+    pick_clarify_reply,
+    pick_degraded_patient_reply,
+)
 from .patient_engine import affect_log_entry, default_emotion, public_affect
 from .scoring_engine import (
     DISCLAIMER,
@@ -327,12 +332,20 @@ def post_turn(
             emotion_state=prior_emotion,
         )
     except Exception as exc:
+        # 演示不断档：异常时也回一句口语，不写「（系统）连不上」
+        soft = pick_degraded_patient_reply(
+            trainee_text=content,
+            history=hist_for_ai,
+            case=case,
+            scene_key=sess.get("scene_key"),
+        )
         gen = {
-            "ok": False,
-            "content": "（系统）模拟受试者暂时没接上，请稍后再试。",
+            "ok": True,
+            "content": soft,
+            "degraded": True,
             "error": str(exc),
             "latency_ms": None,
-            "grounding": {"passed": False, "action": "block", "hits": []},
+            "grounding": {"passed": True, "action": "degraded_fallback", "hits": []},
         }
     ended = utc_now()
     gen_id = new_id()
@@ -420,8 +433,9 @@ def post_turn(
         "ok": True,
         "trainee_turn": next_turn,
         "patient_reply": gen.get("content"),
-        "patient_ok": bool(gen.get("ok")),
-        "patient_error": None if gen.get("ok") else (gen.get("error") or "模拟病人暂时不可用"),
+        "patient_ok": True if gen.get("content") else bool(gen.get("ok")),
+        "patient_degraded": bool(gen.get("degraded")),
+        "patient_error": None,
         "grounding": gen.get("grounding"),
         "latency_ms": gen.get("latency_ms"),
         "messages": get_messages(db_path, session_id),

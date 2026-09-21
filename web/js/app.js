@@ -5375,8 +5375,52 @@ function scrollChatFeedToEnd() {
   go();
   requestAnimationFrame(() => {
     go();
-    requestAnimationFrame(go);
+    requestAnimationFrame(() => {
+      go();
+      bindScrollHintEdges();
+    });
   });
+}
+
+/** 可滚动区域：隐藏原生滚动条，用上下淡出 + 「下滑看更多」提示 */
+function bindScrollHintEdges(root = document) {
+  const nodes = root.querySelectorAll
+    ? root.querySelectorAll('.gal-dialog-feed, .practice-checkpoint-rail, .practice-ref-sidebar-body, .nav, .view')
+    : [];
+  nodes.forEach((el) => {
+    if (!(el instanceof HTMLElement)) return;
+    if (el.dataset.scrollHintBound === '1') {
+      updateScrollHintState(el);
+      return;
+    }
+    el.dataset.scrollHintBound = '1';
+    const onScroll = () => updateScrollHintState(el);
+    el.addEventListener('scroll', onScroll, { passive: true });
+    // 内容变化后重算
+    if (typeof ResizeObserver !== 'undefined') {
+      const ro = new ResizeObserver(() => updateScrollHintState(el));
+      ro.observe(el);
+    }
+    updateScrollHintState(el);
+  });
+}
+
+function updateScrollHintState(el) {
+  if (!(el instanceof HTMLElement)) return;
+  const wrap = el.closest('.gal-dialog-feed-wrap') || el.parentElement;
+  const max = Math.max(0, el.scrollHeight - el.clientHeight);
+  const canScroll = max > 8;
+  const atTop = el.scrollTop <= 4;
+  const atBottom = el.scrollTop >= max - 4;
+  el.classList.toggle('is-scrollable', canScroll);
+  el.classList.toggle('is-at-top', atTop);
+  el.classList.toggle('is-at-bottom', atBottom);
+  if (wrap && wrap !== el) {
+    wrap.classList.toggle('is-scrollable', canScroll);
+    wrap.classList.toggle('is-at-top', atTop);
+    wrap.classList.toggle('is-at-bottom', atBottom);
+    wrap.classList.toggle('show-scroll-hint', canScroll && !atBottom);
+  }
 }
 
 function clearChatInputImmediate() {
@@ -5451,6 +5495,25 @@ function patchPracticeInChatUi() {
   if (moodPill && affectSummary.stance_label) {
     moodPill.textContent = `心情：${p.busy ? '思考中…' : affectSummary.stance_label}`;
   }
+  // 同步轻提示 / 错误条（避免只改 state 却留着旧红条）
+  const glass = $('#gal-dialog-glass');
+  if (glass) {
+    const oldToast = glass.querySelector('.gal-dialog-error');
+    if (p.error) {
+      const pending = /正在生成|几十秒|网络有点慢|简短应答/.test(p.error);
+      const danger = /连不上|失败|错误|无权|不能/.test(p.error) && !pending;
+      const html = `<div class="action-toast gal-dialog-error${pending ? ' is-pending' : (danger ? ' is-danger' : '')}">${escapeHtml(p.error)}</div>`;
+      if (oldToast) {
+        oldToast.className = `action-toast gal-dialog-error${pending ? ' is-pending' : (danger ? ' is-danger' : '')}`;
+        oldToast.textContent = p.error;
+      } else {
+        glass.insertAdjacentHTML('beforeend', html);
+      }
+    } else if (oldToast) {
+      oldToast.remove();
+    }
+  }
+  bindScrollHintEdges();
 }
 
 function buildSessionRecordRow(s) {
@@ -5855,8 +5918,13 @@ function renderPractice() {
                   <span>对话 ${(p.messages || []).filter((m) => m.role !== 'system').length} 条 · ${p.feedExpanded ? '已展开，可上滑看更早内容 · 拖顶边调高度' : '上滑可看历史 · 拖顶边可调高度'}</span>
                   <button type="button" class="practice-link-btn" id="practice-feed-expand">${p.feedExpanded ? '收起对话框' : '展开全部对话'}</button>
                 </div>
-                <div class="gal-dialog-feed${p.feedExpanded ? ' is-expanded' : ''}" id="chat-panel" aria-label="对话记录">
-                  ${buildGalDialogFeed(p.messages, personaLabelText, p.busy)}
+                <div class="gal-dialog-feed-wrap" id="chat-panel-wrap">
+                  <div class="gal-dialog-feed${p.feedExpanded ? ' is-expanded' : ''}" id="chat-panel" aria-label="对话记录">
+                    ${buildGalDialogFeed(p.messages, personaLabelText, p.busy)}
+                  </div>
+                  <div class="scroll-edge scroll-edge--top" aria-hidden="true"></div>
+                  <div class="scroll-edge scroll-edge--bottom" aria-hidden="true"></div>
+                  <div class="scroll-hint-chip" aria-hidden="true"><span>下滑看更多</span></div>
                 </div>
                 ${active ? `
                   <form class="gal-dialog-input" id="chat-form">
@@ -5881,7 +5949,7 @@ function renderPractice() {
                     <button type="button" class="secondary" id="practice-restart">再练一次</button>
                   </div>
                 `}
-                ${p.error ? `<div class="action-toast gal-dialog-error${/正在生成|几十秒/.test(p.error) ? ' is-pending' : (/连不上|失败|错误|无权|不能/.test(p.error) ? ' is-danger' : '')}">${escapeHtml(p.error)}</div>` : ''}
+                ${p.error ? `<div class="action-toast gal-dialog-error${/正在生成|几十秒|网络有点慢|简短应答/.test(p.error) ? ' is-pending' : (/连不上|失败|错误|无权|不能/.test(p.error) ? ' is-danger' : '')}">${escapeHtml(p.error)}</div>` : ''}
               </div>
             </div>
           </section>
@@ -6061,6 +6129,7 @@ function renderPractice() {
   } else if (panel) {
     panel.scrollTop = panel.scrollHeight;
   }
+  bindScrollHintEdges();
 }
 
 async function resumePractice(sessionId) {
@@ -6257,8 +6326,25 @@ async function sendPracticeTurn(text, opts = {}) {
     } else {
       state.practice.patientAffect = inferAffectFromDialogue(null, data.messages || []);
     }
-    if (data.patient_ok === false) {
+    // 模型抖动时后端已用口语兜底：不再反复弹「连不上」红条，最多给一次轻提示
+    if (data.patient_degraded) {
+      const notice = '网络有点慢，受试者先简短应答，可继续说下一句';
+      if (state.practice._softNoticeShown !== notice) {
+        state.practice.error = notice;
+        state.practice._softNoticeShown = notice;
+        window.setTimeout(() => {
+          if (state.practice.error === notice) {
+            state.practice.error = '';
+            if (state.route === 'practice') patchPracticeInChatUi();
+          }
+        }, 4200);
+      } else {
+        state.practice.error = '';
+      }
+    } else if (data.patient_ok === false) {
       state.practice.error = String(data.patient_error || '暂时连不上模拟病人，请稍后重试');
+    } else {
+      state.practice.error = '';
     }
     loadAllSessions().catch(() => {});
     state.practice.busy = false;

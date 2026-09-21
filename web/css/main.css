@@ -9494,7 +9494,124 @@ body.gal-immersive .practice-gal-hud {
   padding: 14px 18px 10px;
   scroll-behavior: smooth;
   -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
+
+.gal-dialog-feed::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+.gal-dialog-feed-wrap {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.gal-dialog-feed-wrap .gal-dialog-feed {
+  flex: 1 1 auto;
+}
+
+.scroll-edge {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 28px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  z-index: 2;
+}
+
+.scroll-edge--top {
+  top: 0;
+  background: linear-gradient(to bottom, rgba(15, 23, 42, 0.55), transparent);
+}
+
+.scroll-edge--bottom {
+  bottom: 0;
+  background: linear-gradient(to top, rgba(15, 23, 42, 0.55), transparent);
+}
+
+.gal-dialog-feed-wrap.is-scrollable:not(.is-at-top) .scroll-edge--top,
+.gal-dialog-feed-wrap.is-scrollable:not(.is-at-bottom) .scroll-edge--bottom {
+  opacity: 1;
+}
+
+.scroll-hint-chip {
+  position: absolute;
+  left: 50%;
+  bottom: 10px;
+  transform: translateX(-50%);
+  z-index: 3;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.gal-dialog-feed-wrap.show-scroll-hint .scroll-hint-chip {
+  opacity: 1;
+  animation: scroll-hint-bob 1.4s ease-in-out infinite;
+}
+
+.scroll-hint-chip span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: rgba(241, 245, 249, 0.95);
+  background: rgba(15, 23, 42, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.28);
+}
+
+.scroll-hint-chip span::after {
+  content: "↓";
+  font-size: 12px;
+  opacity: 0.9;
+}
+
+@keyframes scroll-hint-bob {
+  0%, 100% { transform: translateX(-50%) translateY(0); }
+  50% { transform: translateX(-50%) translateY(4px); }
+}
+
+.practice-checkpoint-rail,
+.practice-ref-sidebar-body,
+.practice-left-stack,
+body.gal-immersive .nav,
+body.gal-immersive .view {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.practice-checkpoint-rail::-webkit-scrollbar,
+.practice-ref-sidebar-body::-webkit-scrollbar,
+.practice-left-stack::-webkit-scrollbar,
+body.gal-immersive .nav::-webkit-scrollbar,
+body.gal-immersive .view::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+.gal-session-brief p {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.gal-session-brief p::-webkit-scrollbar {
+  display: none;
+}
+
 
 .gal-line {
   margin-bottom: 14px;
